@@ -1,0 +1,8 @@
+[package]
+name = "bors"
+version = "0.0.0"
+authors = ["Jack Moffitt <metajack@fb.com>", "Brandon Williams <bmwill@fb.com>"]
+license = "MIT OR Apache-2.0"
+edition = "2018"
+
+[dependencies]
