@@ -1,4 +1,5 @@
-use bors::Service;
+use bors::{Error, Service};
+use futures::future;
 use hyper::{
     server::conn::AddrStream,
     service::{make_service_fn, service_fn},
@@ -6,7 +7,7 @@ use hyper::{
 };
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Error> {
     let addr = ([127, 0, 0, 1], 3000).into();
 
     let service = Service::new();
@@ -21,20 +22,17 @@ async fn main() {
         // once for every connection.
         let service = service.clone();
 
-        async move {
-            // This is the `Service` that will handle the connection.
-            Ok::<_, hyper::Error>(service_fn(move |request| {
-                let service = service.clone();
-                service.serve(request)
-            }))
-        }
+        // This is the `Service` that will handle the connection.
+        future::ok::<_, Error>(service_fn(move |request| {
+            let service = service.clone();
+            service.serve(request)
+        }))
     });
 
     let server = Server::bind(&addr).serve(make_service);
 
     println!("Listening on http://{}", addr);
 
-    if let Err(e) = server.await {
-        eprintln!("server error: {}", e);
-    }
+    server.await?;
+    Ok(())
 }

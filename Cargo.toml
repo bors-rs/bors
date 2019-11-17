@@ -6,8 +6,8 @@ license = "MIT OR Apache-2.0"
 edition = "2018"
 
 [dependencies]
-hyper = "=0.13.0-alpha.4"
+thiserror = "1.0.5"
+hyper = { version = "=0.13.0-alpha.4", features = ["unstable-stream"] }
 tokio = "=0.2.0-alpha.6"
-tower-service = "0.3.0-alpha.2"
 futures = { version = "=0.3.0-alpha.19", package = "futures-preview" }
 graphql_client = "0.8.0"
