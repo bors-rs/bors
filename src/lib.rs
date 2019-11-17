@@ -1,4 +1,7 @@
 mod graphql;
+mod service;
+
+pub use service::Service;
 
 #[cfg(test)]
 mod tests {
