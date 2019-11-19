@@ -1,2 +1,4 @@
 /target
 Cargo.lock
+bors.db
+bors.toml

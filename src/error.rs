@@ -1,5 +1,7 @@
+use sled;
 use std::{borrow::Cow, io};
 use thiserror::Error;
+use crate::config;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -11,6 +13,10 @@ pub enum Error {
     Http(#[from] hyper::http::Error),
     #[error("hyper error")]
     Hyper(#[from] hyper::Error),
+    #[error("config error")]
+    Config(#[from] config::ConfigError),
+    #[error("database error")]
+    Database(#[from] sled::Error),
     #[error("`{0}`")]
     Message(Cow<'static, str>),
 }
