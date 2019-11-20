@@ -5,7 +5,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Server,
 };
-use slog::{Drain, info, o};
+use log::{error, info};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -14,7 +14,7 @@ struct Options {
     #[structopt(short, long, parse(from_os_str), default_value = "bors.toml")]
     /// config file to use
     config: PathBuf,
-    
+
     #[structopt(subcommand)]
     command: Command,
 }
@@ -36,19 +36,13 @@ struct ServeConfig {
 async fn main() -> Result<(), Error> {
     let opts = Options::from_args();
 
-    // set up logging
-    let decorator = slog_term::TermDecorator::new().build();
-    let term_drain = slog_term::CompactFormat::new(decorator)
-        .use_utc_timestamp()
-        .build()
-        .fuse();
-    let async_drain = slog_async::Async::new(term_drain).build().fuse();
-    let log = slog::Logger::root(async_drain, o!());
+    // set up logging, allowing info level logging by default
+    env_logger::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    info!(log, "bors starting");
+    info!("bors starting");
 
     let config = Config::from_file(&opts.config)?;
-    info!(log, "using database {}", config.database);
+    info!("using database {}", config.database);
 
     let _db = Database::open(&config.database)?;
 
@@ -61,7 +55,7 @@ async fn main() -> Result<(), Error> {
             // The closure inside `make_service_fn` is run for each connection,
             // creating a 'service' to handle requests for that specific connection.
             let make_service = make_service_fn(|socket: &AddrStream| {
-                info!(log, "remote address: {:?}", socket.remote_addr());
+                info!("remote address: {:?}", socket.remote_addr());
 
                 // While the state was moved into the make_service closure,
                 // we need to clone it here because this closure is called
@@ -77,7 +71,7 @@ async fn main() -> Result<(), Error> {
 
             let server = Server::bind(&addr).serve(make_service);
 
-            info!(log, "Listening on http://{}", addr);
+            info!("Listening on http://{}", addr);
 
             server.await?;
 
