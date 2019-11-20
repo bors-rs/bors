@@ -27,7 +27,7 @@ pub struct Issue {
     pub closed_at: Option<DateTime>,
     pub created_at: DateTime,
     pub updated_at: DateTime,
-    pub repository: Repository,
+    pub repository: Option<Repository>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -76,7 +76,7 @@ pub struct Label {
     pub node_id: NodeId,
     pub url: String,
     pub name: String,
-    pub description: String,
+    pub description: Option<String>,
     pub color: String,
     pub default: bool,
 }

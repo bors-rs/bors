@@ -5,7 +5,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Server,
 };
-use log::{error, info};
+use log::info;
 use std::path::PathBuf;
 use structopt::StructOpt;
 

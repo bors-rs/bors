@@ -1,4 +1,4 @@
-use super::{DateTime, NodeId, Oid, User};
+use super::{DateTime, EventType, NodeId, Oid, User};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -23,6 +23,25 @@ pub struct Image {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Conclusion {
+    Success,
+    Failure,
+    Neutral,
+    Cancelled,
+    TimedOut,
+    ActionRequired,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckStatus {
+    Queued,
+    InProgress,
+    Completed,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct CheckOutput {
     pub title: String,
     pub summary: String,
@@ -33,6 +52,32 @@ pub struct CheckOutput {
     pub images: Option<Vec<Image>>,
 }
 
+// Maybe rename these?
+#[derive(Debug, Deserialize)]
+pub struct CheckPullRequest {
+    url: String,
+    id: u64,
+    number: u64,
+    head: CheckBranch,
+    base: CheckBranch,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CheckBranch {
+    #[serde(rename = "ref")]
+    git_ref: String,
+    sha: Oid,
+    repo: CheckRepo,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CheckRepo {
+    id: u64,
+    url: String,
+    name: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct CheckRun {
     pub id: u64,
     pub head_sha: Oid,
@@ -41,17 +86,18 @@ pub struct CheckRun {
     pub url: String,
     pub html_url: String,
     pub details_url: String,
-    pub status: String,
-    pub conclusion: Option<String>,
+    pub status: CheckStatus,
+    pub conclusion: Option<Conclusion>,
     pub started_at: DateTime,
     pub completed_at: DateTime,
     pub output: CheckOutput,
     pub name: String,
     pub check_suite: CheckSuite,
     pub app: App,
-    // pull_requests: Vec<PullRequestRef>,
+    pub pull_requests: Vec<CheckPullRequest>,
 }
 
+#[derive(Debug, Deserialize)]
 pub struct App {
     pub id: u64,
     pub slug: String,
@@ -64,21 +110,41 @@ pub struct App {
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub permissions: HashMap<String, String>,
-    pub events: Vec<String>,
+    pub events: Vec<EventType>,
 }
 
+#[derive(Debug, Deserialize)]
 pub struct CheckSuite {
     pub id: u64,
     pub node_id: NodeId,
     pub head_branch: Option<String>,
     pub head_sha: Oid,
-    pub status: String,
-    pub conclusion: Option<String>,
+    pub status: CheckStatus,
+    pub conclusion: Option<Conclusion>,
     pub url: String,
     pub before: Option<String>,
     pub after: Option<String>,
-    // pull_requests: Vec<PullRequestRef>,
+    pub pull_requests: Vec<CheckPullRequest>,
     pub app: App,
     pub created_at: DateTime,
     pub updated_at: DateTime,
+    pub latest_check_runs_count: Option<u64>,
+    pub check_runs_url: Option<String>,
+}
+
+#[cfg(test)]
+mod test {
+    use super::{CheckRun, CheckSuite};
+
+    #[test]
+    fn check_run() {
+        const CHECK_RUN_JSON: &str = include_str!("../test-input/check-run.json");
+        let _: CheckRun = serde_json::from_str(CHECK_RUN_JSON).unwrap();
+    }
+
+    #[test]
+    fn check_suite() {
+        const CHECK_SUITE_JSON: &str = include_str!("../test-input/check-suite.json");
+        let _: CheckSuite = serde_json::from_str(CHECK_SUITE_JSON).unwrap();
+    }
 }

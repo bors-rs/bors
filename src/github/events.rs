@@ -1,7 +1,12 @@
-use super::{PullRequest, Repository, Review, ReviewComment, User};
-use serde::Deserialize;
+use super::{
+    CheckRun, CheckSuite, Comment, Commit, Issue, Label, Oid, PullRequest, Pusher, Repository,
+    Review, ReviewComment, User,
+};
+use serde::{de, Deserialize};
+use std::str::FromStr;
 use thiserror::Error;
 
+#[derive(Debug)]
 pub enum EventType {
     CheckRun,
     CheckSuite,
@@ -41,9 +46,10 @@ pub enum EventType {
     PullRequestReview,
     PullRequestReviewComment,
     Push,
+    RegistryPackage,
     Release,
-    RepositoryDispatch,
     Repository,
+    RepositoryDispatch,
     RepositoryImport,
     RepositoryVulnerabilityAlert,
     SecurityAdvisory,
@@ -58,7 +64,7 @@ pub enum EventType {
 #[error("invalid github webhook event")]
 pub struct ParseEventTypeError;
 
-impl std::str::FromStr for EventType {
+impl FromStr for EventType {
     type Err = ParseEventTypeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -103,6 +109,7 @@ impl std::str::FromStr for EventType {
             "pull_request_review" => Ok(PullRequestReview),
             "pull_request_review_comment" => Ok(PullRequestReviewComment),
             "push" => Ok(Push),
+            "registry_package" => Ok(RegistryPackage),
             "release" => Ok(Release),
             "repository_dispatch" => Ok(RepositoryDispatch),
             "repository" => Ok(Repository),
@@ -116,6 +123,16 @@ impl std::str::FromStr for EventType {
             "watch" => Ok(Watch),
             _ => Err(ParseEventTypeError),
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for EventType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        let s = <&str>::deserialize(deserializer)?;
+        Self::from_str(s).map_err(de::Error::custom)
     }
 }
 
@@ -183,4 +200,158 @@ pub struct PullRequestReviewCommentEvent {
     pull_request: PullRequest,
     repository: Repository,
     sender: User,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PushEvent {
+    #[serde(rename = "ref")]
+    git_ref: String,
+    before: Oid,
+    after: Oid,
+    pusher: Pusher,
+    created: bool,
+    deleted: bool,
+    forced: bool,
+    base_ref: Option<String>,
+    compare: String,
+    commits: Vec<Commit>,
+    head_commit: Option<Commit>,
+    repository: Repository,
+    sender: User,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckRunEventAction {
+    Created,
+    Rerequested,
+    Completed,
+    RequestedAction,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RequestedAction {
+    identifier: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CheckRunEvent {
+    action: CheckRunEventAction,
+    check_run: CheckRun,
+    requested_action: Option<RequestedAction>,
+    repository: Repository,
+    sender: User,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckSuiteEventAction {
+    Completed,
+    Requested,
+    Rerequested,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CheckSuiteEvent {
+    action: CheckSuiteEventAction,
+    check_run: CheckSuite,
+    repository: Repository,
+    sender: User,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueCommentEventAction {
+    Created,
+    Edited,
+    Deleted,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IssueCommentEvent {
+    action: IssueCommentEventAction,
+    // changes: // If action is Edited
+    issue: Issue,
+    comment: Comment,
+    repository: Repository,
+    sender: User,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueEventAction {
+    Opened,
+    Edited,
+    Deleted,
+    Pinned,
+    Unpinned,
+    Closed,
+    Reopened,
+    Assigned,
+    Unassigned,
+    Labeled,
+    Unlabeled,
+    Locked,
+    Unlocked,
+    Transferred,
+    Milestoned,
+    Demilestoned,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IssueEvent {
+    action: IssueEventAction,
+    // changes: // If action is Edited
+    issue: Issue,
+    assignee: Option<User>,
+    label: Option<Label>,
+    repository: Repository,
+    sender: User,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StatusEventState {
+    Pending,
+    Success,
+    Failure,
+    Error,
+}
+#[derive(Debug, Deserialize)]
+pub struct StatusEvent {
+    sha: Oid,
+    state: StatusEventState,
+    description: Option<String>,
+    target_url: Option<String>,
+    // branches: ???,
+    // commit: ???,
+}
+
+#[cfg(test)]
+mod test {
+    use super::{IssueCommentEvent, IssueEvent, PushEvent, StatusEvent};
+
+    #[test]
+    fn push_event() {
+        const PUSH_JSON: &str = include_str!("../test-input/push-event.json");
+        let _push: PushEvent = serde_json::from_str(PUSH_JSON).unwrap();
+    }
+
+    #[test]
+    fn issue_comment_event() {
+        const JSON: &str = include_str!("../test-input/issue-comment-event.json");
+        let _: IssueCommentEvent = serde_json::from_str(JSON).unwrap();
+    }
+
+    #[test]
+    fn issue_event() {
+        const JSON: &str = include_str!("../test-input/issue-event.json");
+        let _: IssueEvent = serde_json::from_str(JSON).unwrap();
+    }
+
+    #[test]
+    fn status_event() {
+        const JSON: &str = include_str!("../test-input/status-event.json");
+        let _: StatusEvent = serde_json::from_str(JSON).unwrap();
+    }
 }

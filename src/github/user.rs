@@ -46,6 +46,12 @@ pub struct Team {
     parent: Option<Box<Team>>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct Pusher {
+    name: String,
+    email: String,
+}
+
 #[cfg(test)]
 mod test {
     use super::{User, UserType};

@@ -76,6 +76,33 @@ pub struct Repository {
     pub open_issues: u64,
     pub watchers: u64,
     pub default_branch: String,
+    // parent: Option<Box<Repository>>,
+    // source: Option<Box<Repository>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Author {
+    pub name: String,
+    pub email: String,
+    pub username: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Commit {
+    pub id: Oid,
+    pub tree_id: Oid,
+    pub distinct: bool,
+    pub message: String,
+    pub timestamp: DateTime,
+    pub url: String,
+    pub author: Author,
+    pub committer: Author,
+    /// List of added files
+    pub added: Vec<String>,
+    /// List of removed files
+    pub removed: Vec<String>,
+    /// List of modified files
+    pub modified: Vec<String>,
 }
 
 #[cfg(test)]
