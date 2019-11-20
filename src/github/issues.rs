@@ -1,4 +1,4 @@
-use super::{Date, NodeId, Repository, User};
+use super::{DateTime, NodeId, Repository, User};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -24,9 +24,9 @@ pub struct Issue {
     pub active_lock_reason: Option<String>,
     pub comments: u64,
     pub pull_request: Option<PullRequestRef>,
-    pub closed_at: Option<Date>,
-    pub created_at: Date,
-    pub updated_at: Date,
+    pub closed_at: Option<DateTime>,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
     pub repository: Repository,
 }
 
@@ -52,10 +52,10 @@ pub struct Milestone {
     pub creator: User,
     pub open_issues: u64,
     pub closed_issues: u64,
-    pub created_at: Date,
-    pub updated_at: Date,
-    pub closed_at: Option<Date>,
-    pub due_on: Date,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+    pub closed_at: Option<DateTime>,
+    pub due_on: DateTime,
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,8 +66,8 @@ pub struct Comment {
     pub html_url: String,
     pub body: Option<String>,
     pub user: User,
-    pub created_at: Date,
-    pub updated_at: Date,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
 }
 
 #[derive(Debug, Deserialize)]

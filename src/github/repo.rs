@@ -1,4 +1,4 @@
-use super::{Date, NodeId, User};
+use super::{DateTime, NodeId, Oid, User};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -49,9 +49,9 @@ pub struct Repository {
     pub labels_url: String,
     pub releases_url: String,
     pub deployments_url: String,
-    pub created_at: Date,
-    pub updated_at: Date,
-    pub pushed_at: Date,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+    pub pushed_at: DateTime,
     pub git_url: String,
     pub ssh_url: String,
     pub clone_url: String,

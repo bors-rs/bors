@@ -1,4 +1,4 @@
-use super::{Date, NodeId, Oid, User};
+use super::{DateTime, NodeId, Oid, User};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -43,8 +43,8 @@ pub struct CheckRun {
     pub details_url: String,
     pub status: String,
     pub conclusion: Option<String>,
-    pub started_at: Date,
-    pub completed_at: Date,
+    pub started_at: DateTime,
+    pub completed_at: DateTime,
     pub output: CheckOutput,
     pub name: String,
     pub check_suite: CheckSuite,
@@ -61,8 +61,8 @@ pub struct App {
     pub description: Option<String>,
     pub external_url: String,
     pub html_url: String,
-    pub created_at: Date,
-    pub updated_at: Date,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
     pub permissions: HashMap<String, String>,
     pub events: Vec<String>,
 }
@@ -79,6 +79,6 @@ pub struct CheckSuite {
     pub after: Option<String>,
     // pull_requests: Vec<PullRequestRef>,
     pub app: App,
-    pub created_at: Date,
-    pub updated_at: Date,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
 }

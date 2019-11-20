@@ -1,4 +1,4 @@
-use super::{Date, Label, Milestone, NodeId, Oid, Repository, Team, User};
+use super::{DateTime, Label, Milestone, NodeId, Oid, Repository, Team, User};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -26,10 +26,10 @@ pub struct PullRequest {
     pub title: String,
     pub user: User,
     pub body: Option<String>,
-    pub created_at: Date,
-    pub updated_at: Date,
-    pub closed_at: Option<Date>,
-    pub merged_at: Option<Date>,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+    pub closed_at: Option<DateTime>,
+    pub merged_at: Option<DateTime>,
     pub merge_commit_sha: Option<Oid>,
     pub assignee: Option<User>,
     pub assignees: Vec<User>,
@@ -68,7 +68,7 @@ pub struct Review {
     pub user: User,
     pub body: Option<String>,
     pub commit_id: Oid,
-    pub submitted_at: Date,
+    pub submitted_at: DateTime,
     pub state: String, // Maybe make a type for this
     pub html_url: String,
     pub pull_request_url: String,
@@ -91,8 +91,8 @@ pub struct ReviewComment {
     pub in_reply_to_id: u64,
     pub user: User,
     pub body: Option<String>,
-    pub created_at: Date,
-    pub updated_at: Date,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
     pub html_url: String,
     pub pull_request_url: String,
     pub author_association: String,
