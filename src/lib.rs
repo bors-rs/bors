@@ -8,4 +8,4 @@ mod service;
 pub use config::Config;
 pub use database::Database;
 pub use error::{Error, Result};
-pub use service::Service;
+pub use service::{Service, ServeOptions, run_serve};

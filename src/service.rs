@@ -1,14 +1,21 @@
 use crate::github::EventType;
-use crate::Result;
+use crate::{Config, Database, Error, Result};
 use bytes::Bytes;
-use futures::stream::TryStreamExt;
+use futures::{future, stream::TryStreamExt};
 use hyper::header::HeaderValue;
 use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::{Body, Method, Request, Response, StatusCode};
+use hyper::{
+    server::conn::AddrStream,
+    service::{make_service_fn, service_fn},
+    Server,
+};
+use log::info;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
+use structopt::StructOpt;
 
 #[derive(Clone, Debug)]
 pub struct Service {
@@ -145,6 +152,43 @@ impl GithubWebhook {
             body,
         })
     }
+}
+
+#[derive(StructOpt)]
+pub struct ServeOptions {
+    #[structopt(long, default_value = "3000")]
+    port: u16,
+}
+
+pub async fn run_serve(_config: &Config, _db: &Database, options: &ServeOptions) -> Result<()> {
+    let addr = ([127, 0, 0, 1], options.port).into();
+
+    let service = Service::new();
+
+    // The closure inside `make_service_fn` is run for each connection,
+    // creating a 'service' to handle requests for that specific connection.
+    let make_service = make_service_fn(|socket: &AddrStream| {
+        info!("remote address: {:?}", socket.remote_addr());
+
+        // While the state was moved into the make_service closure,
+        // we need to clone it here because this closure is called
+        // once for every connection.
+        let service = service.clone();
+
+        // This is the `Service` that will handle the connection.
+        future::ok::<_, Error>(service_fn(move |request| {
+            let service = service.clone();
+            service.serve(request)
+        }))
+    });
+
+    let server = Server::bind(&addr).serve(make_service);
+
+    info!("Listening on http://{}", addr);
+
+    server.await?;
+
+    Ok(())
 }
 
 #[cfg(test)]
