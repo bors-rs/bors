@@ -5,6 +5,7 @@ mod event_processor;
 pub mod github;
 mod graphql;
 mod service;
+mod smee_client;
 
 pub use config::Config;
 pub use database::Database;
