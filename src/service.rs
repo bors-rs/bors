@@ -1,4 +1,4 @@
-use crate::github::EventType;
+use crate::github::{Event, EventType};
 use crate::{Config, Database, Error, Result};
 use bytes::Bytes;
 use futures::{future, stream::TryStreamExt};
@@ -65,11 +65,10 @@ impl Service {
         };
 
         //TODO route on the request
-        match webhook.event {
-            //TODO don't unwrap
-            EventType::PullRequest => {
-                let _pr_event: crate::github::PullRequestEvent =
-                    serde_json::from_slice(&webhook.body).unwrap();
+        //TODO don't unwrap
+        match Event::from_json(&webhook.event, &webhook.body).unwrap() {
+            Event::PullRequest(event) => {
+                info!("{:#?}", event);
             }
             // Unsupported Event
             _ => {}
