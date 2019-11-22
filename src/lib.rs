@@ -1,6 +1,7 @@
 mod config;
 mod database;
 mod error;
+mod event_processor;
 pub mod github;
 mod graphql;
 mod service;
@@ -8,4 +9,4 @@ mod service;
 pub use config::Config;
 pub use database::Database;
 pub use error::{Error, Result};
-pub use service::{Service, ServeOptions, run_serve};
+pub use service::{run_serve, ServeOptions, Service};

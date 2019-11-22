@@ -1,14 +1,15 @@
-use crate::github::{Event, EventType};
-use crate::{Config, Database, Error, Result};
+use crate::{
+    event_processor,
+    github::{Event, EventType},
+    Config, Database, Error, Result,
+};
 use bytes::Bytes;
-use futures::{future, stream::TryStreamExt};
-use hyper::header::HeaderValue;
-use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE};
-use hyper::{Body, Method, Request, Response, StatusCode};
+use futures::{channel::mpsc, future, stream::TryStreamExt};
 use hyper::{
+    header::{HeaderValue, CONTENT_LENGTH, CONTENT_TYPE},
     server::conn::AddrStream,
     service::{make_service_fn, service_fn},
-    Server,
+    Body, Method, Request, Response, Server, StatusCode,
 };
 use log::info;
 use std::sync::{
@@ -20,12 +21,14 @@ use structopt::StructOpt;
 #[derive(Clone, Debug)]
 pub struct Service {
     counter: Arc<AtomicUsize>,
+    event_processor_tx: mpsc::Sender<event_processor::Request>,
 }
 
 impl Service {
-    pub fn new() -> Self {
+    pub fn new(event_processor_tx: mpsc::Sender<event_processor::Request>) -> Self {
         Self {
             counter: Arc::new(AtomicUsize::new(0)),
+            event_processor_tx,
         }
     }
 
@@ -162,7 +165,10 @@ pub struct ServeOptions {
 pub async fn run_serve(_config: &Config, _db: &Database, options: &ServeOptions) -> Result<()> {
     let addr = ([127, 0, 0, 1], options.port).into();
 
-    let service = Service::new();
+    let (tx, event_processor) = event_processor::EventProcessor::new();
+    tokio::spawn(event_processor.start());
+
+    let service = Service::new(tx);
 
     // The closure inside `make_service_fn` is run for each connection,
     // creating a 'service' to handle requests for that specific connection.
@@ -193,14 +199,16 @@ pub async fn run_serve(_config: &Config, _db: &Database, options: &ServeOptions)
 #[cfg(test)]
 mod test {
     use super::Service;
+    use futures::channel::mpsc;
     use hyper::{Body, Method, Request, StatusCode, Uri, Version};
 
     #[tokio::test]
     async fn pull_request_event() {
         static PAYLOAD: &str = include_str!("test-input/pull-request-event-payload");
         let request = request_from_raw_http(PAYLOAD);
+        let (tx, _rx) = mpsc::channel(0);
 
-        let service = Service::new();
+        let service = Service::new(tx);
 
         let resp = service.handle_webhook(request).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);

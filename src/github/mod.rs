@@ -1,3 +1,7 @@
+//! Types for Github's v3 API and webhooks
+//! https://developer.github.com/webhooks/
+//! https://developer.github.com/v3/
+
 mod check;
 mod common;
 mod events;
