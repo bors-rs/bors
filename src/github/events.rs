@@ -378,7 +378,7 @@ pub enum CheckSuiteEventAction {
 #[derive(Debug, Deserialize)]
 pub struct CheckSuiteEvent {
     pub action: CheckSuiteEventAction,
-    pub check_run: CheckSuite,
+    pub check_suite: CheckSuite,
     pub repository: Repository,
     pub sender: User,
 }
@@ -463,7 +463,9 @@ pub struct PingEvent {
 
 #[cfg(test)]
 mod test {
-    use super::{CheckRunEvent, IssueCommentEvent, IssueEvent, PushEvent, StatusEvent};
+    use super::{
+        CheckRunEvent, CheckSuiteEvent, IssueCommentEvent, IssueEvent, PushEvent, StatusEvent,
+    };
 
     #[test]
     fn push_event() {
@@ -493,5 +495,11 @@ mod test {
     fn check_run_event() {
         const JSON: &str = include_str!("../test-input/check-run-event.json");
         let _: CheckRunEvent = serde_json::from_str(JSON).unwrap();
+    }
+
+    #[test]
+    fn check_suite_event() {
+        const JSON: &str = include_str!("../test-input/check-suite-event.json");
+        let _: CheckSuiteEvent = serde_json::from_str(JSON).unwrap();
     }
 }
