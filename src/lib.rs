@@ -1,9 +1,9 @@
+mod command;
 mod config;
 mod error;
 mod event_processor;
 pub mod github;
 mod graphql;
-mod handlers;
 mod probot;
 mod service;
 
