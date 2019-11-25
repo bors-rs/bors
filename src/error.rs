@@ -1,7 +1,7 @@
+use crate::config;
 use sled;
 use std::{borrow::Cow, io};
 use thiserror::Error;
-use crate::config;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -17,6 +17,8 @@ pub enum Error {
     Config(#[from] config::ConfigError),
     #[error("database error")]
     Database(#[from] sled::Error),
+    #[error("json error")]
+    Json(#[from] serde_json::Error),
     #[error("`{0}`")]
     Message(Cow<'static, str>),
 }
