@@ -11,7 +11,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
 };
-use log::info;
+use log::{error, info};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -60,19 +60,18 @@ impl Service {
 
         let webhook = match GithubWebhook::from_request(request).await {
             Ok(webhook) => webhook,
-            Err(_) => {
+            Err(e) => {
+                error!("parsing payload: {:#?}", e);
                 return Ok(Response::builder()
                     .status(StatusCode::BAD_REQUEST)
-                    .body(Body::empty())?)
+                    .body(Body::empty())?);
             }
         };
 
+        info!("{:#?}", webhook.event_type);
         //TODO route on the request
-        //TODO don't unwrap
-        match Event::from_json(&webhook.event, &webhook.body).unwrap() {
-            Event::PullRequest(event) => {
-                info!("{:#?}", event);
-            }
+        match webhook.event {
+            Event::PullRequest(event) => {}
             // Unsupported Event
             _ => {}
         }
@@ -85,10 +84,12 @@ impl Service {
     }
 }
 
+#[derive(Debug)]
 struct GithubWebhook {
-    event: EventType,
-    _guid: String,
-    _signature: Option<String>,
+    event: Event,
+    event_type: EventType,
+    guid: String,
+    signature: Option<String>,
     body: Bytes,
 }
 
@@ -100,7 +101,7 @@ impl GithubWebhook {
             _ => return Err("unknown content type".into()),
         }
 
-        let event = match request
+        let event_type = match request
             .headers()
             .get("X-GitHub-Event")
             .map(HeaderValue::to_str)
@@ -116,7 +117,7 @@ impl GithubWebhook {
             _ => return Err("missing valid X-GitHub-Event header".into()),
         };
 
-        let _guid = match request
+        let guid = match request
             .headers()
             .get("X-GitHub-Delivery")
             .map(HeaderValue::to_str)
@@ -128,7 +129,7 @@ impl GithubWebhook {
             _ => return Err("missing valid X-GitHub-Delivery header".into()),
         };
 
-        let _signature = match request
+        let signature = match request
             .headers()
             .get("X-Hub-Signature")
             .map(HeaderValue::to_str)
@@ -146,11 +147,14 @@ impl GithubWebhook {
 
         let body = request.into_body().try_concat().await?.into_bytes();
 
+        let event = Event::from_json(&event_type, &body)?;
+
         // TODO check Signature
         Ok(Self {
             event,
-            _guid,
-            _signature,
+            event_type,
+            guid,
+            signature,
             body,
         })
     }
