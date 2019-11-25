@@ -463,7 +463,7 @@ pub struct PingEvent {
 
 #[cfg(test)]
 mod test {
-    use super::{IssueCommentEvent, IssueEvent, PushEvent, StatusEvent};
+    use super::{CheckRunEvent, IssueCommentEvent, IssueEvent, PushEvent, StatusEvent};
 
     #[test]
     fn push_event() {
@@ -487,5 +487,11 @@ mod test {
     fn status_event() {
         const JSON: &str = include_str!("../test-input/status-event.json");
         let _: StatusEvent = serde_json::from_str(JSON).unwrap();
+    }
+
+    #[test]
+    fn check_run_event() {
+        const JSON: &str = include_str!("../test-input/check-run-event.json");
+        let _: CheckRunEvent = serde_json::from_str(JSON).unwrap();
     }
 }

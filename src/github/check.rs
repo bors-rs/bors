@@ -43,9 +43,9 @@ pub enum CheckStatus {
 
 #[derive(Debug, Deserialize)]
 pub struct CheckOutput {
-    pub title: String,
-    pub summary: String,
-    pub text: String,
+    pub title: Option<String>,
+    pub summary: Option<String>,
+    pub text: Option<String>,
     pub annotations_count: Option<u64>,
     pub annotations_url: Option<String>,
     pub annotations: Option<Vec<Annotation>>,
@@ -89,7 +89,7 @@ pub struct CheckRun {
     pub status: CheckStatus,
     pub conclusion: Option<Conclusion>,
     pub started_at: DateTime,
-    pub completed_at: DateTime,
+    pub completed_at: Option<DateTime>,
     pub output: CheckOutput,
     pub name: String,
     pub check_suite: CheckSuite,
