@@ -476,7 +476,7 @@ mod test {
     #[test]
     fn issue_comment_event() {
         const JSON: &str = include_str!("../test-input/issue-comment-event.json");
-        let _: IssueCommentEvent = serde_json::from_str(JSON).unwrap();
+        let _: Vec<IssueCommentEvent> = serde_json::from_str(JSON).unwrap();
     }
 
     #[test]

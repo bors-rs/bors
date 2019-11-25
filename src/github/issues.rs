@@ -19,7 +19,7 @@ pub struct Issue {
     pub labels: Vec<Label>,
     pub assignee: Option<User>,
     pub assignees: Vec<User>,
-    pub milestone: Milestone,
+    pub milestone: Option<Milestone>,
     pub locked: bool,
     pub active_lock_reason: Option<String>,
     pub comments: u64,
