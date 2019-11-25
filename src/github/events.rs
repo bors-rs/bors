@@ -1,6 +1,6 @@
 use super::{
-    CheckRun, CheckSuite, Comment, Commit, Issue, Label, Oid, PullRequest, Pusher, Repository,
-    Review, ReviewComment, User,
+    CheckRun, CheckSuite, Comment, Commit, Hook, Issue, Label, Oid, PullRequest, Pusher,
+    Repository, Review, ReviewComment, User,
 };
 use serde::{de, Deserialize};
 use std::str::FromStr;
@@ -38,6 +38,7 @@ pub enum EventType {
     OrgBlock,
     Package,
     PageBuild,
+    Ping,
     ProjectCard,
     ProjectColumn,
     Project,
@@ -58,6 +59,7 @@ pub enum EventType {
     Team,
     TeamAdd,
     Watch,
+    Wildcard,
 }
 
 #[derive(Error, Debug)]
@@ -101,6 +103,7 @@ impl FromStr for EventType {
             "org_block" => Ok(OrgBlock),
             "package" => Ok(Package),
             "page_build" => Ok(PageBuild),
+            "ping" => Ok(Ping),
             "project_card" => Ok(ProjectCard),
             "project_column" => Ok(ProjectColumn),
             "project" => Ok(Project),
@@ -121,6 +124,7 @@ impl FromStr for EventType {
             "team" => Ok(Team),
             "team_add" => Ok(TeamAdd),
             "watch" => Ok(Watch),
+            "*" => Ok(Wildcard),
             _ => Err(ParseEventTypeError),
         }
     }
@@ -156,8 +160,8 @@ pub enum Event {
     Gollum,
     Installation,
     InstallationRepositories,
-    IssueComment,
-    Issues,
+    IssueComment(IssueCommentEvent),
+    Issues(IssueEvent),
     Label,
     MarketplacePurchase,
     Member,
@@ -168,6 +172,7 @@ pub enum Event {
     OrgBlock,
     Package,
     PageBuild,
+    Ping(PingEvent),
     ProjectCard,
     ProjectColumn,
     Project,
@@ -184,7 +189,7 @@ pub enum Event {
     RepositoryVulnerabilityAlert,
     SecurityAdvisory,
     Star,
-    Status,
+    Status(StatusEvent),
     Team,
     TeamAdd,
     Watch,
@@ -212,8 +217,8 @@ impl Event {
             EventType::Gollum => Event::Gollum,
             EventType::Installation => Event::Installation,
             EventType::InstallationRepositories => Event::InstallationRepositories,
-            EventType::IssueComment => Event::IssueComment,
-            EventType::Issues => Event::Issues,
+            EventType::IssueComment => Event::IssueComment(serde_json::from_slice(json)?),
+            EventType::Issues => Event::Issues(serde_json::from_slice(json)?),
             EventType::Label => Event::Label,
             EventType::MarketplacePurchase => Event::MarketplacePurchase,
             EventType::Member => Event::Member,
@@ -224,6 +229,7 @@ impl Event {
             EventType::OrgBlock => Event::OrgBlock,
             EventType::Package => Event::Package,
             EventType::PageBuild => Event::PageBuild,
+            EventType::Ping => Event::Ping(serde_json::from_slice(json)?),
             EventType::ProjectCard => Event::ProjectCard,
             EventType::ProjectColumn => Event::ProjectColumn,
             EventType::Project => Event::Project,
@@ -242,10 +248,13 @@ impl Event {
             EventType::RepositoryVulnerabilityAlert => Event::RepositoryVulnerabilityAlert,
             EventType::SecurityAdvisory => Event::SecurityAdvisory,
             EventType::Star => Event::Star,
-            EventType::Status => Event::Status,
+            EventType::Status => Event::Status(serde_json::from_slice(json)?),
             EventType::Team => Event::Team,
             EventType::TeamAdd => Event::TeamAdd,
             EventType::Watch => Event::Watch,
+            // TODO have an error type if we try to De a wildcard event payload since they don't
+            // exist
+            EventType::Wildcard => unimplemented!(),
         };
         Ok(event)
     }
@@ -276,11 +285,11 @@ pub enum PullRequestEventAction {
 
 #[derive(Debug, Deserialize)]
 pub struct PullRequestEvent {
-    action: PullRequestEventAction,
-    number: u64,
-    pull_request: PullRequest,
-    repository: Repository,
-    sender: User,
+    pub action: PullRequestEventAction,
+    pub number: u64,
+    pub pull_request: PullRequest,
+    pub repository: Repository,
+    pub sender: User,
 }
 
 #[derive(Debug, Deserialize)]
@@ -293,11 +302,11 @@ pub enum PullRequestReviewEventAction {
 
 #[derive(Debug, Deserialize)]
 pub struct PullRequestReviewEvent {
-    action: PullRequestReviewEventAction,
-    review: Review,
-    pull_request: PullRequest,
-    repository: Repository,
-    sender: User,
+    pub action: PullRequestReviewEventAction,
+    pub review: Review,
+    pub pull_request: PullRequest,
+    pub repository: Repository,
+    pub sender: User,
 }
 
 #[derive(Debug, Deserialize)]
@@ -310,29 +319,29 @@ pub enum PullRequestReviewCommentEventAction {
 
 #[derive(Debug, Deserialize)]
 pub struct PullRequestReviewCommentEvent {
-    action: PullRequestReviewCommentEventAction,
-    comment: ReviewComment,
-    pull_request: PullRequest,
-    repository: Repository,
-    sender: User,
+    pub action: PullRequestReviewCommentEventAction,
+    pub comment: ReviewComment,
+    pub pull_request: PullRequest,
+    pub repository: Repository,
+    pub sender: User,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct PushEvent {
     #[serde(rename = "ref")]
-    git_ref: String,
-    before: Oid,
-    after: Oid,
-    pusher: Pusher,
-    created: bool,
-    deleted: bool,
-    forced: bool,
-    base_ref: Option<String>,
-    compare: String,
-    commits: Vec<Commit>,
-    head_commit: Option<Commit>,
-    repository: Repository,
-    sender: User,
+    pub git_ref: String,
+    pub before: Oid,
+    pub after: Oid,
+    pub pusher: Pusher,
+    pub created: bool,
+    pub deleted: bool,
+    pub forced: bool,
+    pub base_ref: Option<String>,
+    pub compare: String,
+    pub commits: Vec<Commit>,
+    pub head_commit: Option<Commit>,
+    pub repository: Repository,
+    pub sender: User,
 }
 
 #[derive(Debug, Deserialize)]
@@ -346,16 +355,16 @@ pub enum CheckRunEventAction {
 
 #[derive(Debug, Deserialize)]
 pub struct RequestedAction {
-    identifier: String,
+    pub identifier: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CheckRunEvent {
-    action: CheckRunEventAction,
-    check_run: CheckRun,
-    requested_action: Option<RequestedAction>,
-    repository: Repository,
-    sender: User,
+    pub action: CheckRunEventAction,
+    pub check_run: CheckRun,
+    pub requested_action: Option<RequestedAction>,
+    pub repository: Repository,
+    pub sender: User,
 }
 
 #[derive(Debug, Deserialize)]
@@ -368,10 +377,10 @@ pub enum CheckSuiteEventAction {
 
 #[derive(Debug, Deserialize)]
 pub struct CheckSuiteEvent {
-    action: CheckSuiteEventAction,
-    check_run: CheckSuite,
-    repository: Repository,
-    sender: User,
+    pub action: CheckSuiteEventAction,
+    pub check_run: CheckSuite,
+    pub repository: Repository,
+    pub sender: User,
 }
 
 #[derive(Debug, Deserialize)]
@@ -384,12 +393,12 @@ pub enum IssueCommentEventAction {
 
 #[derive(Debug, Deserialize)]
 pub struct IssueCommentEvent {
-    action: IssueCommentEventAction,
+    pub action: IssueCommentEventAction,
     // changes: // If action is Edited
-    issue: Issue,
-    comment: Comment,
-    repository: Repository,
-    sender: User,
+    pub issue: Issue,
+    pub comment: Comment,
+    pub repository: Repository,
+    pub sender: User,
 }
 
 #[derive(Debug, Deserialize)]
@@ -415,13 +424,13 @@ pub enum IssueEventAction {
 
 #[derive(Debug, Deserialize)]
 pub struct IssueEvent {
-    action: IssueEventAction,
+    pub action: IssueEventAction,
     // changes: // If action is Edited
-    issue: Issue,
-    assignee: Option<User>,
-    label: Option<Label>,
-    repository: Repository,
-    sender: User,
+    pub issue: Issue,
+    pub assignee: Option<User>,
+    pub label: Option<Label>,
+    pub repository: Repository,
+    pub sender: User,
 }
 
 #[derive(Debug, Deserialize)]
@@ -432,14 +441,24 @@ pub enum StatusEventState {
     Failure,
     Error,
 }
+
 #[derive(Debug, Deserialize)]
 pub struct StatusEvent {
-    sha: Oid,
-    state: StatusEventState,
-    description: Option<String>,
-    target_url: Option<String>,
+    pub sha: Oid,
+    pub state: StatusEventState,
+    pub description: Option<String>,
+    pub target_url: Option<String>,
     // branches: ???,
     // commit: ???,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PingEvent {
+    pub zen: String,
+    pub hook_id: u64,
+    pub hook: Hook,
+    pub repository: Repository,
+    pub sender: User,
 }
 
 #[cfg(test)]

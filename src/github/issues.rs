@@ -70,6 +70,12 @@ pub struct Comment {
     pub updated_at: DateTime,
 }
 
+impl Comment {
+    pub fn body(&self) -> Option<&str> {
+        self.body.as_ref().map(AsRef::as_ref)
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Label {
     pub id: u64,

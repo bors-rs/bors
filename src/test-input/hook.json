@@ -1,0 +1,24 @@
+{
+    "type": "Repository",
+    "id": 160918271,
+    "name": "web",
+    "active": true,
+    "events": [
+      "*"
+    ],
+    "config": {
+      "content_type": "json",
+      "insecure_ssl": "0",
+      "url": "https://smee.io/Vo8O18UlsiCVT9K"
+    },
+    "updated_at": "2019-11-25T19:30:08Z",
+    "created_at": "2019-11-25T19:30:08Z",
+    "url": "https://api.github.com/repos/bmwill/bors-rs/hooks/160918271",
+    "test_url": "https://api.github.com/repos/bmwill/bors-rs/hooks/160918271/test",
+    "ping_url": "https://api.github.com/repos/bmwill/bors-rs/hooks/160918271/pings",
+    "last_response": {
+      "code": null,
+      "status": "unused",
+      "message": null
+    }
+}
