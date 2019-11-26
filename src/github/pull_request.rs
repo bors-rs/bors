@@ -46,19 +46,19 @@ pub struct PullRequest {
     pub base: CommitRef,
     // pub _links: ???
     pub author_association: String,
-    pub draft: bool,
-    pub merged: bool,
+    pub draft: Option<bool>,
+    pub merged: Option<bool>,
     pub mergeable: Option<bool>,
     pub rebaseable: Option<bool>,
-    pub mergeable_state: String,
+    pub mergeable_state: Option<String>,
     pub merged_by: Option<User>,
-    pub comments: u64,
-    pub review_comments: u64,
-    pub maintainer_can_modify: bool,
-    pub commits: u64,
-    pub additions: u64,
-    pub deletions: u64,
-    pub changed_files: u64,
+    pub comments: Option<u64>,
+    pub review_comments: Option<u64>,
+    pub maintainer_can_modify: Option<bool>,
+    pub commits: Option<u64>,
+    pub additions: Option<u64>,
+    pub deletions: Option<u64>,
+    pub changed_files: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -88,7 +88,7 @@ pub struct ReviewComment {
     pub original_position: u64,
     pub commit_id: Oid,
     pub original_commit_id: Oid,
-    pub in_reply_to_id: u64,
+    pub in_reply_to_id: Option<u64>,
     pub user: User,
     pub body: Option<String>,
     pub created_at: DateTime,
@@ -97,12 +97,12 @@ pub struct ReviewComment {
     pub pull_request_url: String,
     pub author_association: String,
     // pub _links
-    pub start_line: u64,
-    pub original_start_line: u64,
-    pub start_side: String,
-    pub line: u64,
-    pub original_line: u64,
-    pub side: String,
+    pub start_line: Option<u64>,
+    pub original_start_line: Option<u64>,
+    pub start_side: Option<String>,
+    pub line: Option<u64>,
+    pub original_line: Option<u64>,
+    pub side: Option<String>,
 }
 
 #[cfg(test)]

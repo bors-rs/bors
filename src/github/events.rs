@@ -494,7 +494,8 @@ pub struct PingEvent {
 #[cfg(test)]
 mod test {
     use super::{
-        CheckRunEvent, CheckSuiteEvent, IssueCommentEvent, IssueEvent, PushEvent, StatusEvent,
+        CheckRunEvent, CheckSuiteEvent, IssueCommentEvent, IssueEvent,
+        PullRequestReviewCommentEvent, PullRequestReviewEvent, PushEvent, StatusEvent,
     };
 
     #[test]
@@ -531,5 +532,17 @@ mod test {
     fn check_suite_event() {
         const JSON: &str = include_str!("../test-input/check-suite-event.json");
         let _: CheckSuiteEvent = serde_json::from_str(JSON).unwrap();
+    }
+
+    #[test]
+    fn pull_request_review() {
+        const JSON: &str = include_str!("../test-input/pull-request-review-event.json");
+        let _: PullRequestReviewEvent = serde_json::from_str(JSON).unwrap();
+    }
+
+    #[test]
+    fn pull_request_review_comment() {
+        const JSON: &str = include_str!("../test-input/pull-request-review-comment-event.json");
+        let _: PullRequestReviewCommentEvent = serde_json::from_str(JSON).unwrap();
     }
 }
