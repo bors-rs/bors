@@ -30,6 +30,12 @@ pub struct Issue {
     pub repository: Option<Repository>,
 }
 
+impl Issue {
+    pub fn is_pull_request(&self) -> bool {
+        self.pull_request.is_some()
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PullRequestRef {
     pub url: String,
