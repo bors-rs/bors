@@ -391,6 +391,16 @@ pub enum IssueCommentEventAction {
     Deleted,
 }
 
+impl IssueCommentEventAction {
+    pub fn is_created(&self) -> bool {
+        if let IssueCommentEventAction::Created = self {
+            true
+        } else {
+            false
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct IssueCommentEvent {
     pub action: IssueCommentEventAction,
