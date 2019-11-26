@@ -300,6 +300,16 @@ pub enum PullRequestReviewEventAction {
     Dismissed,
 }
 
+impl PullRequestReviewEventAction {
+    pub fn is_submitted(&self) -> bool {
+        if let PullRequestReviewEventAction::Submitted = self {
+            true
+        } else {
+            false
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PullRequestReviewEvent {
     pub action: PullRequestReviewEventAction,
