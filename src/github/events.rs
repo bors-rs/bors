@@ -327,6 +327,16 @@ pub enum PullRequestReviewCommentEventAction {
     Deleted,
 }
 
+impl PullRequestReviewCommentEventAction {
+    pub fn is_created(&self) -> bool {
+        if let PullRequestReviewCommentEventAction::Created = self {
+            true
+        } else {
+            false
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PullRequestReviewCommentEvent {
     pub action: PullRequestReviewCommentEventAction,
