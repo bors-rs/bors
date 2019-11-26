@@ -76,6 +76,12 @@ pub struct Review {
     // pub _links
 }
 
+impl Review {
+    pub fn body(&self) -> Option<&str> {
+        self.body.as_ref().map(AsRef::as_ref)
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ReviewComment {
     pub url: String,
@@ -103,6 +109,12 @@ pub struct ReviewComment {
     pub line: Option<u64>,
     pub original_line: Option<u64>,
     pub side: Option<String>,
+}
+
+impl ReviewComment {
+    pub fn body(&self) -> Option<&str> {
+        self.body.as_ref().map(AsRef::as_ref)
+    }
 }
 
 #[cfg(test)]
