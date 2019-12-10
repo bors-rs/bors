@@ -4,8 +4,9 @@ use crate::{
     Config, Database, Error, Result,
 };
 use bytes::Bytes;
-use futures::{channel::mpsc, future, stream::TryStreamExt};
+use futures::{channel::mpsc, future};
 use hyper::{
+    body,
     header::{HeaderValue, CONTENT_LENGTH, CONTENT_TYPE},
     server::conn::AddrStream,
     service::{make_service_fn, service_fn},
@@ -71,7 +72,7 @@ impl Service {
         info!("{:#?}", webhook.event_type);
         //TODO route on the request
         match webhook.event {
-            Event::PullRequest(event) => {}
+            Event::PullRequest(_event) => {}
             // Unsupported Event
             _ => {}
         }
@@ -145,7 +146,7 @@ impl GithubWebhook {
             }
         };
 
-        let body = request.into_body().try_concat().await?.into_bytes();
+        let body = body::to_bytes(request.into_body()).await?;
 
         let event = Event::from_json(&event_type, &body)?;
 
@@ -232,10 +233,9 @@ mod test {
             (key.trim(), value[1..].trim())
         });
 
-        let mut request_builder = Request::builder();
-        request_builder.method(method).uri(uri).version(version);
+        let mut request_builder = Request::builder().method(method).uri(uri).version(version);
         for (key, value) in headers {
-            request_builder.header(key, value);
+            request_builder = request_builder.header(key, value);
         }
 
         request_builder.body(Body::from(payload)).unwrap()
