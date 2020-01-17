@@ -1,6 +1,6 @@
-use bytes::{Buf, buf::BufExt, BytesMut};
 use crate::github::WebhookPayload;
-use hyper::{Body, Client, Request, body::HttpBody};
+use bytes::{buf::BufExt, Buf, BytesMut};
+use hyper::{body::HttpBody, Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use log::info;
 use std::str;
@@ -29,9 +29,7 @@ pub struct SmeeClient {
 
 impl SmeeClient {
     pub fn with_uri<U: Into<String>>(uri: U) -> Self {
-        SmeeClient {
-            uri: uri.into(),
-        }
+        SmeeClient { uri: uri.into() }
     }
 
     pub async fn start(self) {
@@ -66,8 +64,7 @@ enum Event {
     Message(WebhookPayload),
 }
 
-struct EventParser<'b, B: HttpBody + Unpin>
-{
+struct EventParser<'b, B: HttpBody + Unpin> {
     body: &'b mut B,
     buffer: BytesMut,
     event: Option<String>,
@@ -120,7 +117,8 @@ where
                         Some("ready") => Some(Event::Ready),
                         Some("ping") => Some(Event::Ping),
                         None => {
-                            let payload = WebhookPayload::from_json(self.data.as_ref().unwrap().as_bytes())?;
+                            let payload =
+                                WebhookPayload::from_json(self.data.as_ref().unwrap().as_bytes())?;
                             Some(Event::Message(payload))
                         }
                         _ => None,
@@ -129,11 +127,15 @@ where
                     self.event = None;
                     self.data = None;
 
-                    if event.is_some() { return Ok(event); }
+                    if event.is_some() {
+                        return Ok(event);
+                    }
                 }
 
                 // skip comments
-                if line.starts_with(":") { continue }
+                if line.starts_with(":") {
+                    continue;
+                }
 
                 let field;
                 let mut value = None;
@@ -180,10 +182,9 @@ where
     fn contains_end_of_event(&self) -> bool {
         let length = self.buffer.len();
         info!("contains: length = {}", length);
-        info!("eob = {:?}", &self.buffer[length-4..]);
-        (length >= 2 && &self.buffer[length-2..] == b"\n\n") ||
-            (length >= 2 && &self.buffer[length-2..] == b"\r\r") ||
-            (length >= 4 && &self.buffer[length-4..] == b"\r\n\r\n")
+        info!("eob = {:?}", &self.buffer[length - 4..]);
+        (length >= 2 && &self.buffer[length - 2..] == b"\n\n")
+            || (length >= 2 && &self.buffer[length - 2..] == b"\r\r")
+            || (length >= 4 && &self.buffer[length - 4..] == b"\r\n\r\n")
     }
 }
-

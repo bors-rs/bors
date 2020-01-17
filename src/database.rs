@@ -1,6 +1,6 @@
+use crate::Error;
 use sled::Db;
 use std::path::Path;
-use crate::Error;
 
 pub struct Database(sled::Db);
 

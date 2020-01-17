@@ -259,7 +259,10 @@ impl Event {
         Ok(event)
     }
 
-    pub fn from_value(event_type: &EventType, value: serde_json::Value) -> Result<Self, serde_json::Error> {
+    pub fn from_value(
+        event_type: &EventType,
+        value: serde_json::Value,
+    ) -> Result<Self, serde_json::Error> {
         let event = match event_type {
             EventType::CheckRun => Event::CheckRun(serde_json::from_value(value)?),
             EventType::CheckSuite => Event::CheckSuite(serde_json::from_value(value)?),
@@ -297,7 +300,9 @@ impl Event {
             EventType::Project => Event::Project,
             EventType::Public => Event::Public,
             EventType::PullRequest => Event::PullRequest(serde_json::from_value(value)?),
-            EventType::PullRequestReview => Event::PullRequestReview(serde_json::from_value(value)?),
+            EventType::PullRequestReview => {
+                Event::PullRequestReview(serde_json::from_value(value)?)
+            }
             EventType::PullRequestReviewComment => {
                 Event::PullRequestReviewComment(serde_json::from_value(value)?)
             }

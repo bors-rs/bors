@@ -1,10 +1,4 @@
-use bors::{
-    Config,
-    Database,
-    Error,
-    ServeOptions,
-    run_serve,
-};
+use bors::{run_serve, Config, Database, Error, ServeOptions};
 use log::info;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -25,7 +19,6 @@ enum Command {
     /// Run the server
     Serve(ServeOptions),
 }
-
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
