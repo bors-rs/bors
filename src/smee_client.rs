@@ -1,5 +1,5 @@
 use crate::github::WebhookPayload;
-use bytes::{buf::BufExt, Buf, BytesMut};
+use bytes::{Buf, BytesMut};
 use hyper::{body::HttpBody, Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use log::info;

@@ -1,8 +1,7 @@
 use super::{Event, EventType};
-use serde::{de, Deserialize};
+use serde::de;
 use serde_json::Value;
 use std::str::FromStr;
-use thiserror::Error;
 
 // TODO need to store the hash somewhere so it can be checked
 #[derive(Debug)]
