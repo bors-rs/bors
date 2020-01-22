@@ -141,6 +141,7 @@ impl<'de> Deserialize<'de> for EventType {
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum Event {
     CheckRun(CheckRunEvent),
     CheckSuite(CheckSuiteEvent),

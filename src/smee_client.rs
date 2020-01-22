@@ -56,6 +56,7 @@ impl SmeeClient {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 enum SmeeEvent {
     Ready,
     Ping,
@@ -140,7 +141,7 @@ impl<'b> SmeeEventParser<'b> {
             }
 
             // skip comments
-            if line.starts_with(":") {
+            if line.starts_with(':') {
                 continue;
             }
 

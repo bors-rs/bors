@@ -71,11 +71,11 @@ impl Service {
 
         info!("{:#?}", webhook.event_type);
         //TODO route on the request
-        match webhook.event {
-            Event::PullRequest(_event) => {}
-            // Unsupported Event
-            _ => {}
-        }
+        // match webhook.event {
+        //     Event::PullRequest(_event) => {}
+        //     // Unsupported Event
+        //     _ => {}
+        // }
 
         Ok(Response::builder()
             .status(StatusCode::OK)
