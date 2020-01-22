@@ -81,8 +81,6 @@ pub struct SmeeMessage<'a> {
 struct SmeeEventParser<'b, B: HttpBody + Unpin> {
     body: &'b mut B,
     buffer: BytesMut,
-    event: Option<String>,
-    data: Option<String>,
 }
 
 impl<'b, B: HttpBody + Unpin + std::fmt::Debug> SmeeEventParser<'b, B>
@@ -93,8 +91,6 @@ where
         Self {
             body,
             buffer: BytesMut::with_capacity(0),
-            event: None,
-            data: None,
         }
     }
 
@@ -109,95 +105,105 @@ where
             }
 
             info!("got whole message");
-            let string = str::from_utf8(self.buffer.bytes())?.to_string();
+            if let Some(event) = Self::parse_smee_event(&self.buffer)? {
+                return Ok(Some(event));
+            }
+
             // clear the buffer
             self.buffer.clear();
+        }
 
-            for line in string.lines() {
-                info!("line = {}", line);
+        Ok(None)
+    }
 
-                // dispatch event if blank line
-                if line.is_empty() {
-                    // dispatch the event, step 1
-                    if self.data.is_none() {
-                        self.event = None;
-                        self.data = None;
-                        continue;
-                    }
+    fn parse_smee_event(raw_event: &[u8]) -> Result<Option<SmeeEvent>, SmeeError<B>> {
+        let mut smee_event_type: Option<String> = None;
+        let mut data: Option<String> = None;
 
-                    // dispatch the event, steps 3 & 4
-                    info!("event = {:?}\ndata = {:?}", self.event, self.data);
-                    let event = match self.event.as_ref().map(String::as_str) {
-                        Some("ready") => Some(SmeeEvent::Ready),
-                        Some("ping") => Some(SmeeEvent::Ping),
-                        None => {
-                            let smee_msg: SmeeMessage =
-                                serde_json::from_slice(self.data.as_ref().unwrap().as_bytes())?;
-                            let event = Event::from_json(
-                                &smee_msg.event_type,
-                                smee_msg.event.get().as_bytes(),
-                            )?;
-                            let webhook = Webhook {
-                                event_type: smee_msg.event_type,
-                                event,
-                                guid: smee_msg.guid,
-                                signature: smee_msg.signature,
-                                body: None,
-                            };
-                            Some(SmeeEvent::Message(webhook))
-                        }
-                        _ => None,
-                    };
+        for line in str::from_utf8(raw_event)?.lines() {
+            info!("line = {}", line);
 
-                    self.event = None;
-                    self.data = None;
-
-                    if event.is_some() {
-                        return Ok(event);
-                    }
-                }
-
-                // skip comments
-                if line.starts_with(":") {
+            // dispatch event if blank line
+            if line.is_empty() {
+                // dispatch the event, step 1
+                if data.is_none() {
+                    smee_event_type = None;
+                    data = None;
                     continue;
                 }
 
-                let field;
-                let mut value = None;
-
-                if let Some(i) = line.find(':') {
-                    let (f, v) = line.split_at(i);
-                    field = f;
-                    if v.starts_with(": ") {
-                        value = v.get(2..);
-                    } else {
-                        value = v.get(1..);
+                // dispatch the event, steps 3 & 4
+                info!("event = {:?}\ndata = {:?}", smee_event_type, data);
+                let event = match smee_event_type.as_ref().map(String::as_str) {
+                    Some("ready") => Some(SmeeEvent::Ready),
+                    Some("ping") => Some(SmeeEvent::Ping),
+                    None => {
+                        let smee_msg: SmeeMessage =
+                            serde_json::from_slice(data.as_ref().unwrap().as_bytes())?;
+                        let event = Event::from_json(
+                            &smee_msg.event_type,
+                            smee_msg.event.get().as_bytes(),
+                        )?;
+                        let webhook = Webhook {
+                            event_type: smee_msg.event_type,
+                            event,
+                            guid: smee_msg.guid,
+                            signature: smee_msg.signature,
+                            body: None,
+                        };
+                        Some(SmeeEvent::Message(webhook))
                     }
+                    _ => None,
+                };
+
+                smee_event_type = None;
+                data = None;
+
+                if event.is_some() {
+                    return Ok(event);
+                }
+            }
+
+            // skip comments
+            if line.starts_with(":") {
+                continue;
+            }
+
+            let field;
+            let mut value = None;
+
+            if let Some(i) = line.find(':') {
+                let (f, v) = line.split_at(i);
+                field = f;
+                if v.starts_with(": ") {
+                    value = v.get(2..);
                 } else {
-                    field = line;
+                    value = v.get(1..);
+                }
+            } else {
+                field = line;
+            }
+
+            match field {
+                "event" => {
+                    if let Some(value) = value {
+                        smee_event_type = Some(value.to_string());
+                    }
                 }
 
-                match field {
-                    "event" => {
-                        if let Some(value) = value {
-                            self.event = Some(value.to_string());
+                "data" => {
+                    if let Some(value) = value {
+                        if let Some(ref mut data) = data {
+                            data.push_str("\n");
+                            data.push_str(value);
+                        } else {
+                            data = Some(value.to_string());
                         }
                     }
-
-                    "data" => {
-                        if let Some(value) = value {
-                            if let Some(ref mut data) = self.data {
-                                data.push_str("\n");
-                                data.push_str(value);
-                            } else {
-                                self.data = Some(value.to_string());
-                            }
-                        }
-                    }
-
-                    // ignore other fields (id, retry, etc)
-                    _ => {}
                 }
+
+                // ignore other fields (id, retry, etc)
+                _ => {}
             }
         }
 
