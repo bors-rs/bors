@@ -2,9 +2,10 @@ use crate::github::{Event, EventType, Webhook};
 use bytes::{Buf, BytesMut};
 use hyper::{body::HttpBody, Body, Client, Request};
 use hyper_tls::HttpsConnector;
-use log::info;
+use log::{debug, info};
 use serde::Deserialize;
 use serde_json::value::RawValue;
+use std::borrow::Cow;
 use std::str;
 use thiserror::Error;
 
@@ -90,56 +91,43 @@ where
     fn from_body(body: &'b mut B) -> Self {
         Self {
             body,
-            buffer: BytesMut::with_capacity(0),
+            buffer: BytesMut::new(),
         }
     }
 
     async fn next(&mut self) -> Result<Option<SmeeEvent>, SmeeError<B>> {
         while let Some(data) = self.body.data().await {
             let data = data.map_err(SmeeError::Body)?;
-            info!("bytes = {:?}", data.bytes());
+            debug!("bytes = {:?}", data.bytes());
             self.buffer.extend_from_slice(data.bytes());
             if !self.contains_end_of_event() {
-                info!("message isn't ended, reading more");
+                debug!("message isn't ended, reading more");
                 continue;
             }
 
-            info!("got whole message");
-            if let Some(event) = Self::parse_smee_event(&self.buffer)? {
+            debug!("got whole message");
+            if let Some(event) = Self::parse_smee_event(&self.buffer.split())? {
                 return Ok(Some(event));
             }
-
-            // clear the buffer
-            self.buffer.clear();
         }
 
         Ok(None)
     }
 
     fn parse_smee_event(raw_event: &[u8]) -> Result<Option<SmeeEvent>, SmeeError<B>> {
-        let mut smee_event_type: Option<String> = None;
-        let mut data: Option<String> = None;
+        let mut smee_event_type = None;
+        let mut data: Option<Cow<'_, str>> = None;
 
         for line in str::from_utf8(raw_event)?.lines() {
-            info!("line = {}", line);
+            debug!("line = {}", line);
 
             // dispatch event if blank line
             if line.is_empty() {
-                // dispatch the event, step 1
-                if data.is_none() {
-                    smee_event_type = None;
-                    data = None;
-                    continue;
-                }
-
-                // dispatch the event, steps 3 & 4
-                info!("event = {:?}\ndata = {:?}", smee_event_type, data);
-                let event = match smee_event_type.as_ref().map(String::as_str) {
-                    Some("ready") => Some(SmeeEvent::Ready),
-                    Some("ping") => Some(SmeeEvent::Ping),
-                    None => {
-                        let smee_msg: SmeeMessage =
-                            serde_json::from_slice(data.as_ref().unwrap().as_bytes())?;
+                let event = match (smee_event_type.take(), data.take()) {
+                    (Some("ready"), Some(_)) => Some(SmeeEvent::Ready),
+                    (Some("ping"), Some(_)) => Some(SmeeEvent::Ping),
+                    (None, Some(data)) => {
+                        let smee_msg: SmeeMessage = serde_json::from_str(&data)?;
                         let event = Event::from_json(
                             &smee_msg.event_type,
                             smee_msg.event.get().as_bytes(),
@@ -153,15 +141,10 @@ where
                         };
                         Some(SmeeEvent::Message(webhook))
                     }
-                    _ => None,
+                    _ => continue,
                 };
 
-                smee_event_type = None;
-                data = None;
-
-                if event.is_some() {
-                    return Ok(event);
-                }
+                return Ok(event);
             }
 
             // skip comments
@@ -187,17 +170,17 @@ where
             match field {
                 "event" => {
                     if let Some(value) = value {
-                        smee_event_type = Some(value.to_string());
+                        smee_event_type = Some(value);
                     }
                 }
 
                 "data" => {
                     if let Some(value) = value {
-                        if let Some(ref mut data) = data {
-                            data.push_str("\n");
-                            data.push_str(value);
+                        if let Some(data) = data.as_mut() {
+                            data.to_mut().push_str("\n");
+                            data.to_mut().push_str(value);
                         } else {
-                            data = Some(value.to_string());
+                            data = Some(Cow::Borrowed(value));
                         }
                     }
                 }
@@ -212,8 +195,8 @@ where
 
     fn contains_end_of_event(&self) -> bool {
         let length = self.buffer.len();
-        info!("contains: length = {}", length);
-        info!("eob = {:?}", &self.buffer[length - 4..]);
+        debug!("contains: length = {}", length);
+        debug!("eob = {:?}", &self.buffer[length - 4..]);
         (length >= 2 && &self.buffer[length - 2..] == b"\n\n")
             || (length >= 2 && &self.buffer[length - 2..] == b"\r\r")
             || (length >= 4 && &self.buffer[length - 4..] == b"\r\n\r\n")
