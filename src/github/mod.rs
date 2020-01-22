@@ -10,7 +10,7 @@ mod issues;
 mod pull_request;
 mod repo;
 mod user;
-mod webhook_payload;
+mod webhook;
 
 pub use check::*;
 pub use common::*;
@@ -20,4 +20,4 @@ pub use issues::*;
 pub use pull_request::*;
 pub use repo::*;
 pub use user::*;
-pub use webhook_payload::*;
+pub use webhook::*;

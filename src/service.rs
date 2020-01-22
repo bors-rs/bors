@@ -1,10 +1,9 @@
 use crate::{
     event_processor,
-    github::{Event, EventType},
+    github::{Event, EventType, Webhook},
     smee_client::SmeeClient,
     Config, Database, Error, Result,
 };
-use bytes::Bytes;
 use futures::{channel::mpsc, future};
 use hyper::{
     body,
@@ -60,7 +59,7 @@ impl Service {
         assert_eq!(request.method(), &Method::POST);
         assert_eq!(request.uri().path(), "/github");
 
-        let webhook = match GithubWebhook::from_request(request).await {
+        let webhook = match webhook_from_request(request).await {
             Ok(webhook) => webhook,
             Err(e) => {
                 error!("parsing payload: {:#?}", e);
@@ -86,80 +85,72 @@ impl Service {
     }
 }
 
-#[derive(Debug)]
-struct GithubWebhook {
-    event: Event,
-    event_type: EventType,
-    guid: String,
-    signature: Option<String>,
-    body: Bytes,
-}
-
-impl GithubWebhook {
-    async fn from_request(request: Request<Body>, /*, secret: Option<String>*/) -> Result<Self> {
-        // Webhooks from github should only contain json payloads
-        match request.headers().get(CONTENT_TYPE).map(HeaderValue::to_str) {
-            Some(Ok("application/json")) => {}
-            _ => return Err("unknown content type".into()),
-        }
-
-        let event_type = match request
-            .headers()
-            .get("X-GitHub-Event")
-            .map(HeaderValue::to_str)
-            .transpose()
-            .ok()
-            .and_then(std::convert::identity)
-            .map(str::parse::<EventType>)
-            .transpose()
-            .ok()
-            .and_then(std::convert::identity)
-        {
-            Some(event) => event,
-            _ => return Err("missing valid X-GitHub-Event header".into()),
-        };
-
-        let guid = match request
-            .headers()
-            .get("X-GitHub-Delivery")
-            .map(HeaderValue::to_str)
-            .transpose()
-            .ok()
-            .and_then(std::convert::identity)
-        {
-            Some(guid) => guid.to_owned(),
-            _ => return Err("missing valid X-GitHub-Delivery header".into()),
-        };
-
-        let signature = match request
-            .headers()
-            .get("X-Hub-Signature")
-            .map(HeaderValue::to_str)
-            .transpose()
-            .ok()
-            .and_then(std::convert::identity)
-        {
-            Some(guid) if guid.starts_with("sha1=") => Some(guid["sha1=".len()..].to_owned()),
-            _ => {
-                None
-                // TODO return an error if we're expecting a sig
-                // return Err("missing valid X-Hub-Signature header".into());
-            }
-        };
-
-        let body = body::to_bytes(request.into_body()).await?;
-
-        let event = Event::from_json(&event_type, &body)?;
-
-        // TODO check Signature
-        Ok(Self {
-            event,
-            event_type,
-            guid,
-            signature,
-            body,
-        })
+async fn webhook_from_request(
+    request: Request<Body>,
+    //secret: Option<String>
+) -> Result<Webhook> {
+    // Webhooks from github should only contain json payloads
+    match request.headers().get(CONTENT_TYPE).map(HeaderValue::to_str) {
+        Some(Ok("application/json")) => {}
+        _ => return Err("unknown content type".into()),
     }
+
+    let event_type = match request
+        .headers()
+        .get("X-GitHub-Event")
+        .map(HeaderValue::to_str)
+        .transpose()
+        .ok()
+        .and_then(std::convert::identity)
+        .map(str::parse::<EventType>)
+        .transpose()
+        .ok()
+        .and_then(std::convert::identity)
+    {
+        Some(event) => event,
+        _ => return Err("missing valid X-GitHub-Event header".into()),
+    };
+
+    let guid = match request
+        .headers()
+        .get("X-GitHub-Delivery")
+        .map(HeaderValue::to_str)
+        .transpose()
+        .ok()
+        .and_then(std::convert::identity)
+    {
+        Some(guid) => guid.to_owned(),
+        _ => return Err("missing valid X-GitHub-Delivery header".into()),
+    };
+
+    let signature = match request
+        .headers()
+        .get("X-Hub-Signature")
+        .map(HeaderValue::to_str)
+        .transpose()
+        .ok()
+        .and_then(std::convert::identity)
+    {
+        Some(guid) if guid.starts_with("sha1=") => Some(guid["sha1=".len()..].to_owned()),
+        _ => {
+            None
+            // TODO return an error if we're expecting a sig
+            // return Err("missing valid X-Hub-Signature header".into());
+        }
+    };
+
+    let body = body::to_bytes(request.into_body()).await?;
+
+    let event = Event::from_json(&event_type, &body)?;
+
+    // TODO check Signature
+    Ok(Webhook {
+        event,
+        event_type,
+        guid,
+        signature,
+        body: Some(body),
+    })
 }
 
 #[derive(StructOpt)]

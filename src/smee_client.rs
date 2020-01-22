@@ -1,8 +1,10 @@
-use crate::github::WebhookPayload;
+use crate::github::{Event, EventType, Webhook};
 use bytes::{Buf, BytesMut};
 use hyper::{body::HttpBody, Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use log::info;
+use serde::Deserialize;
+use serde_json::value::RawValue;
 use std::str;
 use thiserror::Error;
 
@@ -45,38 +47,50 @@ impl SmeeClient {
         info!("response status = {}", response.status());
 
         let body = response.body_mut();
-        let mut event_parser = EventParser::from_body(body);
+        let mut event_parser = SmeeEventParser::from_body(body);
         while let Some(event) = event_parser.next().await.unwrap() {
             match event {
-                Event::Ready => info!("ready!"),
-                Event::Ping => info!("ping!"),
-                Event::Message(ref _payload) => {
-                    info!("message!");
+                SmeeEvent::Ready => info!("ready!"),
+                SmeeEvent::Ping => info!("ping!"),
+                SmeeEvent::Message(payload) => {
+                    info!("message!: {:?}", payload);
                 }
             }
         }
     }
 }
 
-enum Event {
+enum SmeeEvent {
     Ready,
     Ping,
-    Message(WebhookPayload),
+    Message(Webhook),
 }
 
-struct EventParser<'b, B: HttpBody + Unpin> {
+#[derive(Debug, Deserialize)]
+pub struct SmeeMessage<'a> {
+    #[serde(rename = "x-github-event")]
+    event_type: EventType,
+    #[serde(borrow, rename = "body")]
+    event: &'a RawValue,
+    #[serde(rename = "x-github-delivery")]
+    guid: String,
+    #[serde(rename = "x-hub-signature")]
+    signature: Option<String>,
+}
+
+struct SmeeEventParser<'b, B: HttpBody + Unpin> {
     body: &'b mut B,
     buffer: BytesMut,
     event: Option<String>,
     data: Option<String>,
 }
 
-impl<'b, B: HttpBody + Unpin + std::fmt::Debug> EventParser<'b, B>
+impl<'b, B: HttpBody + Unpin + std::fmt::Debug> SmeeEventParser<'b, B>
 where
     B::Error: std::fmt::Debug,
 {
     fn from_body(body: &'b mut B) -> Self {
-        EventParser {
+        Self {
             body,
             buffer: BytesMut::with_capacity(0),
             event: None,
@@ -84,7 +98,7 @@ where
         }
     }
 
-    async fn next(&mut self) -> Result<Option<Event>, SmeeError<B>> {
+    async fn next(&mut self) -> Result<Option<SmeeEvent>, SmeeError<B>> {
         while let Some(data) = self.body.data().await {
             let data = data.map_err(SmeeError::Body)?;
             info!("bytes = {:?}", data.bytes());
@@ -114,12 +128,23 @@ where
                     // dispatch the event, steps 3 & 4
                     info!("event = {:?}\ndata = {:?}", self.event, self.data);
                     let event = match self.event.as_ref().map(String::as_str) {
-                        Some("ready") => Some(Event::Ready),
-                        Some("ping") => Some(Event::Ping),
+                        Some("ready") => Some(SmeeEvent::Ready),
+                        Some("ping") => Some(SmeeEvent::Ping),
                         None => {
-                            let payload =
-                                WebhookPayload::from_json(self.data.as_ref().unwrap().as_bytes())?;
-                            Some(Event::Message(payload))
+                            let smee_msg: SmeeMessage =
+                                serde_json::from_slice(self.data.as_ref().unwrap().as_bytes())?;
+                            let event = Event::from_json(
+                                &smee_msg.event_type,
+                                smee_msg.event.get().as_bytes(),
+                            )?;
+                            let webhook = Webhook {
+                                event_type: smee_msg.event_type,
+                                event,
+                                guid: smee_msg.guid,
+                                signature: smee_msg.signature,
+                                body: None,
+                            };
+                            Some(SmeeEvent::Message(webhook))
                         }
                         _ => None,
                     };
