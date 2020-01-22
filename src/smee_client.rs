@@ -10,16 +10,11 @@ use std::str;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum SmeeError<B: HttpBody + std::fmt::Debug>
-where
-    B::Error: std::fmt::Debug,
-{
+pub enum SmeeError {
     #[error("http error")]
     Http(#[from] hyper::http::Error),
     #[error("hyper error")]
     Hyper(#[from] hyper::Error),
-    #[error("body error")]
-    Body(B::Error),
     #[error("utf8 error")]
     Utf8(#[from] str::Utf8Error),
     #[error("json error")]
@@ -79,25 +74,22 @@ pub struct SmeeMessage<'a> {
     signature: Option<String>,
 }
 
-struct SmeeEventParser<'b, B: HttpBody + Unpin> {
-    body: &'b mut B,
+struct SmeeEventParser<'b> {
+    body: &'b mut Body,
     buffer: BytesMut,
 }
 
-impl<'b, B: HttpBody + Unpin + std::fmt::Debug> SmeeEventParser<'b, B>
-where
-    B::Error: std::fmt::Debug,
-{
-    fn from_body(body: &'b mut B) -> Self {
+impl<'b> SmeeEventParser<'b> {
+    fn from_body(body: &'b mut Body) -> Self {
         Self {
             body,
             buffer: BytesMut::new(),
         }
     }
 
-    async fn next(&mut self) -> Result<Option<SmeeEvent>, SmeeError<B>> {
+    async fn next(&mut self) -> Result<Option<SmeeEvent>, SmeeError> {
         while let Some(data) = self.body.data().await {
-            let data = data.map_err(SmeeError::Body)?;
+            let data = data?;
             debug!("bytes = {:?}", data.bytes());
             self.buffer.extend_from_slice(data.bytes());
             if !self.contains_end_of_event() {
@@ -114,7 +106,7 @@ where
         Ok(None)
     }
 
-    fn parse_smee_event(raw_event: &[u8]) -> Result<Option<SmeeEvent>, SmeeError<B>> {
+    fn parse_smee_event(raw_event: &[u8]) -> Result<Option<SmeeEvent>, SmeeError> {
         let mut smee_event_type = None;
         let mut data: Option<Cow<'_, str>> = None;
 
