@@ -7,5 +7,5 @@ pub struct Webhook {
     pub event_type: EventType,
     pub guid: String,
     pub signature: Option<String>,
-    pub body: Option<Bytes>,
+    pub body: Bytes,
 }

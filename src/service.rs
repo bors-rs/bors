@@ -1,10 +1,10 @@
 use crate::{
-    event_processor,
+    event_processor::{EventProcessor, EventProcessorSender},
     github::{Event, EventType, Webhook},
     smee_client::SmeeClient,
     Config, Database, Error, Result,
 };
-use futures::{channel::mpsc, future};
+use futures::future;
 use hyper::{
     body,
     header::{HeaderValue, CONTENT_LENGTH, CONTENT_TYPE},
@@ -22,23 +22,23 @@ use structopt::StructOpt;
 #[derive(Clone, Debug)]
 pub struct Service {
     counter: Arc<AtomicUsize>,
-    event_processor_tx: mpsc::Sender<event_processor::Request>,
+    event_processor_tx: EventProcessorSender,
 }
 
 impl Service {
-    pub fn new(event_processor_tx: mpsc::Sender<event_processor::Request>) -> Self {
+    pub fn new(event_processor_tx: EventProcessorSender) -> Self {
         Self {
             counter: Arc::new(AtomicUsize::new(0)),
             event_processor_tx,
         }
     }
 
-    pub async fn serve(self, request: Request<Body>) -> Result<Response<Body>> {
+    pub async fn serve(mut self, request: Request<Body>) -> Result<Response<Body>> {
         self.counter.fetch_add(1, Ordering::AcqRel);
         self.handle_request(request).await
     }
 
-    async fn handle_request(&self, request: Request<Body>) -> Result<Response<Body>> {
+    async fn handle_request(&mut self, request: Request<Body>) -> Result<Response<Body>> {
         match (request.method(), request.uri().path()) {
             (&Method::GET, "/") => {
                 let count = self.counter.load(Ordering::Relaxed);
@@ -55,7 +55,7 @@ impl Service {
         }
     }
 
-    async fn handle_webhook(&self, request: Request<Body>) -> Result<Response<Body>> {
+    async fn handle_webhook(&mut self, request: Request<Body>) -> Result<Response<Body>> {
         assert_eq!(request.method(), &Method::POST);
         assert_eq!(request.uri().path(), "/github");
 
@@ -70,12 +70,8 @@ impl Service {
         };
 
         info!("{:#?}", webhook.event_type);
-        //TODO route on the request
-        // match webhook.event {
-        //     Event::PullRequest(_event) => {}
-        //     // Unsupported Event
-        //     _ => {}
-        // }
+        // Send Webhook to EventProcessor
+        self.event_processor_tx.webhook(webhook).await;
 
         Ok(Response::builder()
             .status(StatusCode::OK)
@@ -85,10 +81,7 @@ impl Service {
     }
 }
 
-async fn webhook_from_request(
-    request: Request<Body>,
-    //secret: Option<String>
-) -> Result<Webhook> {
+async fn webhook_from_request(request: Request<Body>) -> Result<Webhook> {
     // Webhooks from github should only contain json payloads
     match request.headers().get(CONTENT_TYPE).map(HeaderValue::to_str) {
         Some(Ok("application/json")) => {}
@@ -131,25 +124,19 @@ async fn webhook_from_request(
         .ok()
         .and_then(std::convert::identity)
     {
-        Some(guid) if guid.starts_with("sha1=") => Some(guid["sha1=".len()..].to_owned()),
-        _ => {
-            None
-            // TODO return an error if we're expecting a sig
-            // return Err("missing valid X-Hub-Signature header".into());
-        }
+        Some(signature) => Some(signature.to_owned()),
+        _ => None,
     };
 
     let body = body::to_bytes(request.into_body()).await?;
-
     let event = Event::from_json(&event_type, &body)?;
 
-    // TODO check Signature
     Ok(Webhook {
         event,
         event_type,
         guid,
         signature,
-        body: Some(body),
+        body,
     })
 }
 
@@ -165,12 +152,12 @@ pub struct ServeOptions {
 }
 
 pub async fn run_serve(_config: &Config, _db: &Database, options: &ServeOptions) -> Result<()> {
-    match options.smee {
+    let (tx, event_processor) = EventProcessor::new();
+    tokio::spawn(event_processor.start());
+
+    match &options.smee {
         None => {
             let addr = ([127, 0, 0, 1], options.port).into();
-
-            let (tx, event_processor) = event_processor::EventProcessor::new();
-            tokio::spawn(event_processor.start());
 
             let service = Service::new(tx);
 
@@ -199,8 +186,8 @@ pub async fn run_serve(_config: &Config, _db: &Database, options: &ServeOptions)
 
             Ok(())
         }
-        Some(ref smee_uri) => {
-            let client = SmeeClient::with_uri(smee_uri);
+        Some(smee_uri) => {
+            let client = SmeeClient::with_uri(smee_uri, tx);
             //tokio::spawn(client.start());
             client.start().await;
 
@@ -212,6 +199,7 @@ pub async fn run_serve(_config: &Config, _db: &Database, options: &ServeOptions)
 #[cfg(test)]
 mod test {
     use super::Service;
+    use crate::event_processor::EventProcessorSender;
     use futures::channel::mpsc;
     use hyper::{Body, Method, Request, StatusCode, Uri, Version};
 
@@ -219,9 +207,10 @@ mod test {
     async fn pull_request_event() {
         static PAYLOAD: &str = include_str!("test-input/pull-request-event-payload");
         let request = request_from_raw_http(PAYLOAD);
-        let (tx, _rx) = mpsc::channel(0);
+        //TODO figure out the best way to mock the EventProcessor
+        let (tx, _rx) = mpsc::channel(1);
 
-        let service = Service::new(tx);
+        let mut service = Service::new(EventProcessorSender::new(tx));
 
         let resp = service.handle_webhook(request).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);

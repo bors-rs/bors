@@ -1,5 +1,6 @@
+use crate::event_processor::EventProcessorSender;
 use crate::github::{Event, EventType, Webhook};
-use bytes::{Buf, BytesMut};
+use bytes::{Buf, Bytes, BytesMut};
 use hyper::{body::HttpBody, Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use log::info;
@@ -23,14 +24,18 @@ pub enum SmeeError {
 
 pub struct SmeeClient {
     uri: String,
+    event_processor_tx: EventProcessorSender,
 }
 
 impl SmeeClient {
-    pub fn with_uri<U: Into<String>>(uri: U) -> Self {
-        SmeeClient { uri: uri.into() }
+    pub fn with_uri<U: Into<String>>(uri: U, event_processor_tx: EventProcessorSender) -> Self {
+        SmeeClient {
+            uri: uri.into(),
+            event_processor_tx,
+        }
     }
 
-    pub async fn start(self) {
+    pub async fn start(mut self) {
         let connector = HttpsConnector::new();
         let client = Client::builder().build(connector);
         let request = Request::builder()
@@ -48,8 +53,10 @@ impl SmeeClient {
             match event {
                 SmeeEvent::Ready => info!("ready!"),
                 SmeeEvent::Ping => info!("ping!"),
-                SmeeEvent::Message(payload) => {
-                    info!("message!: {:?}", payload);
+                SmeeEvent::Message(webhook) => {
+                    info!("message!");
+                    // Send Event to EventProcessor
+                    self.event_processor_tx.webhook(webhook).await;
                 }
             }
         }
@@ -130,14 +137,14 @@ impl<'b> SmeeEventParser<'b> {
             (Some("ping"), Some(_)) => SmeeEvent::Ping,
             (None, Some(data)) => {
                 let smee_msg: SmeeMessage = serde_json::from_str(&data)?;
-                let event =
-                    Event::from_json(&smee_msg.event_type, smee_msg.event.get().as_bytes())?;
+                let body = Bytes::copy_from_slice(smee_msg.event.get().as_bytes());
+                let event = Event::from_json(&smee_msg.event_type, &body)?;
                 let webhook = Webhook {
                     event_type: smee_msg.event_type,
                     event,
                     guid: smee_msg.guid,
                     signature: smee_msg.signature,
-                    body: None,
+                    body,
                 };
                 SmeeEvent::Message(webhook)
             }
