@@ -151,8 +151,8 @@ pub struct ServeOptions {
     smee: Option<String>,
 }
 
-pub async fn run_serve(_config: &Config, _db: &Database, options: &ServeOptions) -> Result<()> {
-    let (tx, event_processor) = EventProcessor::new();
+pub async fn run_serve(config: Config, _db: &Database, options: &ServeOptions) -> Result<()> {
+    let (tx, event_processor) = EventProcessor::new(config);
     tokio::spawn(event_processor.start());
 
     match &options.smee {

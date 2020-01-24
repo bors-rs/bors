@@ -1,6 +1,7 @@
 use crate::github::Webhook;
+use crate::Config;
 use futures::{channel::mpsc, sink::SinkExt, stream::StreamExt};
-use log::info;
+use log::{info, warn};
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -27,13 +28,20 @@ impl EventProcessorSender {
 
 #[derive(Debug)]
 pub struct EventProcessor {
+    config: Config,
     requests_rx: mpsc::Receiver<Request>,
 }
 
 impl EventProcessor {
-    pub fn new() -> (EventProcessorSender, Self) {
+    pub fn new(config: Config) -> (EventProcessorSender, Self) {
         let (tx, rx) = mpsc::channel(1024);
-        (EventProcessorSender::new(tx), Self { requests_rx: rx })
+        (
+            EventProcessorSender::new(tx),
+            Self {
+                config,
+                requests_rx: rx,
+            },
+        )
     }
 
     pub async fn start(mut self) {
@@ -52,5 +60,12 @@ impl EventProcessor {
 
     fn handle_webhook(&self, webhook: Webhook) {
         info!("Handling Webhook: {}", webhook.guid);
+
+        if webhook.check_signature(self.config.secret()) {
+            //TODO Handle event
+            info!("Signature check PASSED!");
+        } else {
+            warn!("Signature check FAILED! Skipping Event.");
+        }
     }
 }

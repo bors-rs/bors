@@ -34,7 +34,7 @@ async fn main() -> Result<(), Error> {
 
     let db = Database::open(&config.database)?;
 
-    match opts.command {
-        Command::Serve(ref options) => run_serve(&config, &db, options).await,
+    match &opts.command {
+        Command::Serve(options) => run_serve(config, &db, options).await,
     }
 }
