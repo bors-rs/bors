@@ -24,31 +24,34 @@ impl SmeeClient {
         }
     }
 
-    pub async fn start(mut self) {
+    //TODO take a closer look at the errors that happen in this call stack to determine which are
+    // fatal and which should be handled and ignored
+    pub async fn start(mut self) -> Result<()> {
         let connector = HttpsConnector::new();
         let client = Client::builder().build(connector);
         let request = Request::builder()
             .method("GET")
             .uri(&self.uri)
             .header("Accept", "text/event-stream")
-            .body(Body::empty())
-            .unwrap();
-        let mut response = client.request(request).await.unwrap();
+            .body(Body::empty())?;
+        let mut response = client.request(request).await?;
         info!("response status = {}", response.status());
 
         let body = response.body_mut();
         let mut event_parser = SmeeEventParser::from_body(body);
-        while let Some(event) = event_parser.next().await.unwrap() {
+        while let Some(event) = event_parser.next().await? {
             match event {
                 SmeeEvent::Ready => info!("ready!"),
                 SmeeEvent::Ping => info!("ping!"),
                 SmeeEvent::Message(webhook) => {
                     info!("message!");
                     // Send Event to EventProcessor
-                    self.event_processor_tx.webhook(webhook).await;
+                    self.event_processor_tx.webhook(webhook).await?;
                 }
             }
         }
+
+        Ok(())
     }
 }
 

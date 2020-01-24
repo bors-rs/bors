@@ -20,9 +20,8 @@ impl EventProcessorSender {
         Self { inner }
     }
 
-    //TODO don't unwrap this but rather return an Error
-    pub async fn webhook(&mut self, webhook: Webhook) {
-        self.inner.send(Request::Webhook(webhook)).await.unwrap()
+    pub async fn webhook(&mut self, webhook: Webhook) -> Result<(), mpsc::SendError> {
+        self.inner.send(Request::Webhook(webhook)).await
     }
 }
 

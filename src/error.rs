@@ -19,6 +19,8 @@ pub enum Error {
     Json(#[from] serde_json::Error),
     #[error("utf8 error")]
     Utf8(#[from] str::Utf8Error),
+    #[error("channel error")]
+    Channel(#[from] futures::channel::mpsc::SendError),
     #[error("`{0}`")]
     Message(Cow<'static, str>),
 }

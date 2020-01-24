@@ -71,7 +71,7 @@ impl Service {
 
         info!("{:#?}", webhook.event_type);
         // Send Webhook to EventProcessor
-        self.event_processor_tx.webhook(webhook).await;
+        self.event_processor_tx.webhook(webhook).await?;
 
         Ok(Response::builder()
             .status(StatusCode::OK)
@@ -151,6 +151,7 @@ pub struct ServeOptions {
     smee: Option<String>,
 }
 
+//TODO Make sure to join and await on all of the JoinHandles of the tasks that get spawned
 pub async fn run_serve(config: Config, _db: &Database, options: &ServeOptions) -> Result<()> {
     let (tx, event_processor) = EventProcessor::new(config);
     tokio::spawn(event_processor.start());
@@ -189,7 +190,7 @@ pub async fn run_serve(config: Config, _db: &Database, options: &ServeOptions) -
         Some(smee_uri) => {
             let client = SmeeClient::with_uri(smee_uri, tx);
             //tokio::spawn(client.start());
-            client.start().await;
+            client.start().await?;
 
             Ok(())
         }
