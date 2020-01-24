@@ -1,17 +1,6 @@
+use crate::Result;
 use serde::Deserialize;
-use std::fs;
-use std::io;
-use std::path::Path;
-use thiserror::Error;
-use toml;
-
-#[derive(Debug, Error)]
-pub enum ConfigError {
-    #[error("io error")]
-    Io(#[from] io::Error),
-    #[error("toml parsing error")]
-    De(#[from] toml::de::Error),
-}
+use std::{fs, path::Path};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -20,7 +9,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, ConfigError> {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let contents = fs::read_to_string(path)?;
         Ok(toml::from_str(&contents)?)
     }

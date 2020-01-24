@@ -1,4 +1,4 @@
-use bors::{run_serve, Config, Database, Error, ServeOptions};
+use bors::{run_serve, Config, Database, Result, ServeOptions};
 use log::info;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -21,7 +21,7 @@ enum Command {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
     let opts = Options::from_args();
 
     // set up logging, allowing info level logging by default

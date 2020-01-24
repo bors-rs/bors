@@ -1,26 +1,15 @@
-use crate::event_processor::EventProcessorSender;
-use crate::github::{Event, EventType, Webhook};
+use crate::{
+    event_processor::EventProcessorSender,
+    github::{Event, EventType, Webhook},
+    Result,
+};
 use bytes::{Buf, Bytes, BytesMut};
 use hyper::{body::HttpBody, Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use log::info;
 use serde::Deserialize;
 use serde_json::value::RawValue;
-use std::borrow::Cow;
-use std::str;
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum SmeeError {
-    #[error("http error")]
-    Http(#[from] hyper::http::Error),
-    #[error("hyper error")]
-    Hyper(#[from] hyper::Error),
-    #[error("utf8 error")]
-    Utf8(#[from] str::Utf8Error),
-    #[error("json error")]
-    Json(#[from] serde_json::Error),
-}
+use std::{borrow::Cow, str};
 
 pub struct SmeeClient {
     uri: String,
@@ -100,7 +89,7 @@ impl<'b> SmeeEventParser<'b> {
         }
     }
 
-    async fn next(&mut self) -> Result<Option<SmeeEvent>, SmeeError> {
+    async fn next(&mut self) -> Result<Option<SmeeEvent>> {
         while let Some(raw_event) = self.next_server_sent_event().await? {
             let server_sent_event = Self::parse_server_sent_event(&raw_event)?;
 
@@ -114,7 +103,7 @@ impl<'b> SmeeEventParser<'b> {
 
     /// Contiune polling data off of the stream, splitting off and returning every time a complete
     /// Event is found
-    async fn next_server_sent_event(&mut self) -> Result<Option<BytesMut>, SmeeError> {
+    async fn next_server_sent_event(&mut self) -> Result<Option<BytesMut>> {
         loop {
             if let Some(idx) = self.find_end_of_event() {
                 return Ok(Some(self.buffer.split_to(idx)));
@@ -129,9 +118,7 @@ impl<'b> SmeeEventParser<'b> {
         }
     }
 
-    fn parse_smee_event(
-        server_sent_event: ServerSentEvent<'_>,
-    ) -> Result<Option<SmeeEvent>, SmeeError> {
+    fn parse_smee_event(server_sent_event: ServerSentEvent<'_>) -> Result<Option<SmeeEvent>> {
         let event = match (server_sent_event.event, server_sent_event.data) {
             (Some("ready"), Some(_)) => SmeeEvent::Ready,
             (Some("ping"), Some(_)) => SmeeEvent::Ping,
@@ -154,7 +141,7 @@ impl<'b> SmeeEventParser<'b> {
         Ok(Some(event))
     }
 
-    fn parse_server_sent_event(raw_event: &[u8]) -> Result<ServerSentEvent<'_>, SmeeError> {
+    fn parse_server_sent_event(raw_event: &[u8]) -> Result<ServerSentEvent<'_>> {
         let mut event = None;
         let mut data: Option<Cow<'_, str>> = None;
 

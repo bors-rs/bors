@@ -1,6 +1,4 @@
-use crate::config;
-use sled;
-use std::{borrow::Cow, io};
+use std::{borrow::Cow, io, str};
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -13,12 +11,14 @@ pub enum Error {
     Http(#[from] hyper::http::Error),
     #[error("hyper error")]
     Hyper(#[from] hyper::Error),
-    #[error("config error")]
-    Config(#[from] config::ConfigError),
+    #[error("toml parsing error")]
+    Toml(#[from] toml::de::Error),
     #[error("database error")]
     Database(#[from] sled::Error),
     #[error("json error")]
     Json(#[from] serde_json::Error),
+    #[error("utf8 error")]
+    Utf8(#[from] str::Utf8Error),
     #[error("`{0}`")]
     Message(Cow<'static, str>),
 }
