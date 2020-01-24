@@ -1,6 +1,6 @@
 use crate::{command::Command, graphql::GithubClient, Config};
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
-use github::{Event, EventType};
+use github::{Event, EventType, NodeId};
 use hotpot_db::HotPot;
 use log::info;
 
@@ -95,17 +95,20 @@ impl EventProcessor {
             Event::IssueComment(e) => {
                 // Only process commands from newly created comments
                 if e.action.is_created() && e.issue.is_pull_request() {
-                    self.process_comment(e.comment.body()).await
+                    self.process_comment(e.comment.body(), &e.comment.node_id)
+                        .await
                 }
             }
             Event::PullRequestReview(e) => {
                 if e.action.is_submitted() {
-                    self.process_comment(e.review.body()).await
+                    self.process_comment(e.review.body(), &e.review.node_id)
+                        .await
                 }
             }
             Event::PullRequestReviewComment(e) => {
                 if e.action.is_created() {
-                    self.process_comment(e.comment.body()).await
+                    self.process_comment(e.comment.body(), &e.comment.node_id)
+                        .await
                 }
             }
             // Unsupported Event
@@ -113,11 +116,17 @@ impl EventProcessor {
         }
     }
 
-    async fn process_comment(&self, comment: Option<&str>) {
+    async fn process_comment(&self, comment: Option<&str>, node_id: &NodeId) {
         info!("comment: {:#?}", comment);
         match comment.and_then(Command::from_comment) {
             Some(Ok(_)) => {
                 info!("Valid Command");
+
+                self.github
+                    .add_reaction(node_id, github::ReactionType::Rocket)
+                    .await
+                    // TODO handle or ignore error
+                    .unwrap();
             }
             Some(Err(_)) => {
                 info!("Invalid Command");

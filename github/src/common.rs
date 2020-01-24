@@ -4,6 +4,12 @@ use std::fmt;
 #[derive(Clone, Debug, Deserialize)]
 pub struct NodeId(String);
 
+impl NodeId {
+    pub fn id(&self) -> &str {
+        &self.0
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct Oid(String);
 
