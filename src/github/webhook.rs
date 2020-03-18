@@ -1,6 +1,6 @@
 use super::{Event, EventType};
 use bytes::Bytes;
-use log::debug;
+use log::{debug, warn};
 
 #[derive(Debug)]
 pub struct Webhook {
@@ -27,7 +27,7 @@ impl Webhook {
             (Some(_), _) => false,
             // No key or signature to check
             (None, _) => {
-                debug!("no key to check");
+                warn!("No secret specified in config; signature ignored");
                 true
             }
         }
