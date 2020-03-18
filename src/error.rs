@@ -13,8 +13,6 @@ pub enum Error {
     Hyper(#[from] hyper::Error),
     #[error("toml parsing error")]
     Toml(#[from] toml::de::Error),
-    #[error("database error")]
-    Database(#[from] sled::Error),
     #[error("json error")]
     Json(#[from] serde_json::Error),
     #[error("utf8 error")]

@@ -2,7 +2,7 @@ use crate::{
     event_processor::{EventProcessor, EventProcessorSender},
     github::{Event, EventType, Webhook},
     smee_client::SmeeClient,
-    Config, Database, Error, Result,
+    Config, Error, Result,
 };
 use futures::future;
 use hyper::{
@@ -152,7 +152,7 @@ pub struct ServeOptions {
 }
 
 //TODO Make sure to join and await on all of the JoinHandles of the tasks that get spawned
-pub async fn run_serve(config: Config, _db: &Database, options: &ServeOptions) -> Result<()> {
+pub async fn run_serve(config: Config, options: &ServeOptions) -> Result<()> {
     let (tx, event_processor) = EventProcessor::new(config);
     tokio::spawn(event_processor.start());
 

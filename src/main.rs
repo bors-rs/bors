@@ -1,4 +1,4 @@
-use bors::{run_serve, Config, Database, Result, ServeOptions};
+use bors::{run_serve, Config, Result, ServeOptions};
 use log::info;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -30,11 +30,8 @@ async fn main() -> Result<()> {
     info!("bors starting");
 
     let config = Config::from_file(&opts.config)?;
-    info!("using database {}", config.database);
-
-    let db = Database::open(&config.database)?;
 
     match &opts.command {
-        Command::Serve(options) => run_serve(config, &db, options).await,
+        Command::Serve(options) => run_serve(config, options).await,
     }
 }

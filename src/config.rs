@@ -4,7 +4,6 @@ use std::{fs, path::Path};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub database: String,
     pub secret: Option<String>,
 }
 

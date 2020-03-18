@@ -6,7 +6,7 @@ use crate::{
 use bytes::{Buf, Bytes, BytesMut};
 use hyper::{body::HttpBody, Body, Client, Request};
 use hyper_tls::HttpsConnector;
-use log::info;
+use log::debug;
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use std::{borrow::Cow, str};

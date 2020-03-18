@@ -1,6 +1,8 @@
 use crate::github::Webhook;
+use crate::handlers::Handlers;
 use crate::Config;
-use futures::{channel::mpsc, sink::SinkExt, stream::StreamExt};
+use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
+use hotpot_db::HotPot;
 use log::{info, warn};
 
 #[derive(Debug)]
@@ -28,7 +30,9 @@ impl EventProcessorSender {
 #[derive(Debug)]
 pub struct EventProcessor {
     config: Config,
+    db: Mutex<HotPot>,
     requests_rx: mpsc::Receiver<Request>,
+    handlers: Handlers,
 }
 
 impl EventProcessor {
@@ -38,7 +42,9 @@ impl EventProcessor {
             EventProcessorSender::new(tx),
             Self {
                 config,
+                db: Mutex::new(HotPot::new()),
                 requests_rx: rx,
+                handlers: Handlers::new(),
             },
         )
     }
@@ -61,8 +67,9 @@ impl EventProcessor {
         info!("Handling Webhook: {}", webhook.guid);
 
         if webhook.check_signature(self.config.secret()) {
-            //TODO Handle event
             info!("Signature check PASSED!");
+
+            self.handlers.handle(webhook);
         } else {
             warn!("Signature check FAILED! Skipping Event.");
         }
