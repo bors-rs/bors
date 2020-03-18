@@ -26,7 +26,10 @@ impl Webhook {
             // expected or no signature was sent.
             (Some(_), _) => false,
             // No key or signature to check
-            (None, _) => true,
+            (None, _) => {
+                debug!("no key to check");
+                true
+            }
         }
     }
 }

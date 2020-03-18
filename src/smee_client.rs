@@ -35,16 +35,16 @@ impl SmeeClient {
             .header("Accept", "text/event-stream")
             .body(Body::empty())?;
         let mut response = client.request(request).await?;
-        info!("response status = {}", response.status());
+        debug!("response status = {}", response.status());
 
         let body = response.body_mut();
         let mut event_parser = SmeeEventParser::from_body(body);
         while let Some(event) = event_parser.next().await? {
             match event {
-                SmeeEvent::Ready => info!("ready!"),
-                SmeeEvent::Ping => info!("ping!"),
+                SmeeEvent::Ready => debug!("ready!"),
+                SmeeEvent::Ping => debug!("ping!"),
                 SmeeEvent::Message(webhook) => {
-                    info!("message!");
+                    debug!("message!");
                     // Send Event to EventProcessor
                     self.event_processor_tx.webhook(webhook).await?;
                 }
