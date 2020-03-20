@@ -1,32 +1,35 @@
 use crate::{
-    event_processor::EventProcessorSender,
     github::{Event, EventType, Webhook},
+    probot::Server,
     Result,
 };
 use bytes::{Buf, Bytes, BytesMut};
 use hyper::{body::HttpBody, Body, Client, Request};
 use hyper_tls::HttpsConnector;
-use log::debug;
+use log::{debug, info};
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use std::{borrow::Cow, str};
 
 pub struct SmeeClient {
     uri: String,
-    event_processor_tx: EventProcessorSender,
+    server: Server,
 }
 
 impl SmeeClient {
-    pub fn with_uri<U: Into<String>>(uri: U, event_processor_tx: EventProcessorSender) -> Self {
+    //TODO handle `http://smee.io/new` uri
+    pub fn with_uri<U: Into<String>>(uri: U, server: Server) -> Self {
         SmeeClient {
             uri: uri.into(),
-            event_processor_tx,
+            server,
         }
     }
 
     //TODO take a closer look at the errors that happen in this call stack to determine which are
     // fatal and which should be handled and ignored
     pub async fn start(mut self) -> Result<()> {
+        info!("Starting SmeeClient with {}", self.uri);
+
         let connector = HttpsConnector::new();
         let client = Client::builder().build(connector);
         let request = Request::builder()
@@ -45,8 +48,8 @@ impl SmeeClient {
                 SmeeEvent::Ping => debug!("ping!"),
                 SmeeEvent::Message(webhook) => {
                     debug!("message!");
-                    // Send Event to EventProcessor
-                    self.event_processor_tx.webhook(webhook).await?;
+                    // Have the server process the webhook
+                    self.server.handle_webhook(webhook).await?;
                 }
             }
         }

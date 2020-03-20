@@ -1,6 +1,4 @@
-use crate::github::Webhook;
-use crate::handlers::Handlers;
-use crate::Config;
+use crate::{github::Webhook, handlers::Handlers, probot, Config};
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
 use hotpot_db::HotPot;
 use log::{info, warn};
@@ -8,7 +6,6 @@ use log::{info, warn};
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum Request {
-    Empty,
     Webhook(Webhook),
 }
 
@@ -24,6 +21,17 @@ impl EventProcessorSender {
 
     pub async fn webhook(&mut self, webhook: Webhook) -> Result<(), mpsc::SendError> {
         self.inner.send(Request::Webhook(webhook)).await
+    }
+}
+
+#[async_trait::async_trait]
+impl probot::Service for EventProcessorSender {
+    fn route(&self, _webhook: &Webhook) -> bool {
+        true
+    }
+
+    async fn handle(&self, webhook: &Webhook) {
+        self.clone().webhook(webhook.clone()).await.unwrap();
     }
 }
 
@@ -59,7 +67,6 @@ impl EventProcessor {
         use Request::*;
         match request {
             Webhook(webhook) => self.handle_webhook(webhook),
-            Empty => {}
         }
     }
 

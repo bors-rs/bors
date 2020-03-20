@@ -11,6 +11,8 @@ pub enum Error {
     Http(#[from] hyper::http::Error),
     #[error("hyper error")]
     Hyper(#[from] hyper::Error),
+    #[error("Tokio Join error")]
+    JoinError(#[from] tokio::task::JoinError),
     #[error("toml parsing error")]
     Toml(#[from] toml::de::Error),
     #[error("json error")]
