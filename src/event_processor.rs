@@ -1,7 +1,7 @@
 use crate::{github::Webhook, handlers::Handlers, probot, Config};
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
 use hotpot_db::HotPot;
-use log::{info, warn};
+use log::info;
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -73,12 +73,6 @@ impl EventProcessor {
     fn handle_webhook(&self, webhook: Webhook) {
         info!("Handling Webhook: {}", webhook.guid);
 
-        if webhook.check_signature(self.config.secret()) {
-            info!("Signature check PASSED!");
-
-            self.handlers.handle(webhook);
-        } else {
-            warn!("Signature check FAILED! Skipping Event.");
-        }
+        self.handlers.handle(webhook);
     }
 }

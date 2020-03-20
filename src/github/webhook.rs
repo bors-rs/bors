@@ -5,13 +5,18 @@ use log::{debug, warn};
 #[derive(Clone, Debug)]
 pub struct Webhook {
     pub event: Event,
+    pub guid: String,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct RawWebhook {
     pub event_type: EventType,
     pub guid: String,
     pub signature: Option<String>,
     pub body: Bytes,
 }
 
-impl Webhook {
+impl RawWebhook {
     pub fn check_signature(&self, key: Option<&[u8]>) -> bool {
         match (key, &self.signature) {
             (Some(key), Some(signature)) if signature.starts_with("sha1=") => {
@@ -27,9 +32,17 @@ impl Webhook {
             (Some(_), _) => false,
             // No key or signature to check
             (None, _) => {
-                warn!("No secret specified in config; signature ignored");
+                warn!("No secret specified; signature ignored");
                 true
             }
         }
+    }
+
+    pub fn to_webhook(&self) -> Result<Webhook, serde_json::Error> {
+        let event = Event::from_json(&self.event_type, &self.body)?;
+        Ok(Webhook {
+            event,
+            guid: self.guid.clone(),
+        })
     }
 }

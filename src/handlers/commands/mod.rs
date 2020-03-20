@@ -8,7 +8,7 @@ pub struct CommandHandler;
 impl Handler for CommandHandler {
     fn route(&self, webhook: &Webhook) -> bool {
         matches!(
-            webhook.event_type,
+            webhook.event.event_type(),
             EventType::IssueComment | EventType::PullRequestReview
         )
     }

@@ -1,5 +1,5 @@
 use crate::{
-    github::{Event, EventType, Webhook},
+    github::{EventType, RawWebhook},
     probot::Server,
     Result,
 };
@@ -62,7 +62,7 @@ impl SmeeClient {
 enum SmeeEvent {
     Ready,
     Ping,
-    Message(Webhook),
+    Message(RawWebhook),
 }
 
 #[derive(Debug, Deserialize)]
@@ -131,10 +131,8 @@ impl<'b> SmeeEventParser<'b> {
             (None, Some(data)) => {
                 let smee_msg: SmeeMessage = serde_json::from_str(&data)?;
                 let body = Bytes::copy_from_slice(smee_msg.event.get().as_bytes());
-                let event = Event::from_json(&smee_msg.event_type, &body)?;
-                let webhook = Webhook {
+                let webhook = RawWebhook {
                     event_type: smee_msg.event_type,
-                    event,
                     guid: smee_msg.guid,
                     signature: smee_msg.signature,
                     body,

@@ -1,5 +1,5 @@
 use crate::{
-    github::{Event, EventType, Webhook},
+    github::{EventType, RawWebhook},
     probot::{service::Service, smee_client::SmeeClient},
     Error, Result,
 };
@@ -14,7 +14,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server as HyperServer, StatusCode,
 };
-use log::{error, info};
+use log::{error, info, warn};
 use std::{
     net::SocketAddr,
     sync::{
@@ -23,11 +23,14 @@ use std::{
     },
 };
 
+//TODO Maybe use a config file for common probot like configs (e.g. secret)
 #[derive(Default, Debug)]
 pub struct ServerBuilder {
     smee: bool,
     /// smee.io URL
     smee_url: Option<String>,
+    /// Github Secret
+    secret: Option<String>,
     services: Vec<Box<dyn Service>>,
 }
 
@@ -43,9 +46,14 @@ impl ServerBuilder {
         self
     }
 
+    pub fn secret(mut self, secret: String) -> Self {
+        self.secret = Some(secret);
+        self
+    }
+
     pub async fn serve(self, addr: SocketAddr) -> Result<()> {
         // Construct the server
-        let server = Server::new(self.services);
+        let server = Server::new(self.services, self.secret);
 
         // The closure inside `make_service_fn` is run for each connection,
         // creating a 'service' to handle requests for that specific connection.
@@ -89,7 +97,10 @@ impl ServerBuilder {
 #[derive(Clone, Debug)]
 pub struct Server {
     counter: Arc<AtomicUsize>,
+    /// Services
     services: Arc<Vec<Box<dyn Service>>>,
+    /// Github Secret
+    secret: Option<String>,
 }
 
 impl Server {
@@ -97,10 +108,11 @@ impl Server {
         ServerBuilder::default()
     }
 
-    fn new(services: Vec<Box<dyn Service>>) -> Self {
+    fn new(services: Vec<Box<dyn Service>>, secret: Option<String>) -> Self {
         Self {
             counter: Arc::new(AtomicUsize::new(0)),
             services: Arc::new(services),
+            secret,
         }
     }
 
@@ -150,8 +162,18 @@ impl Server {
             .body(Body::from("OK"))?)
     }
 
-    pub(super) async fn handle_webhook(&mut self, webhook: Webhook) -> Result<()> {
-        //TODO maybe check signatures and store webhook in database here
+    //TODO maybe insert into database here
+    pub(super) async fn handle_webhook(&mut self, raw_webhook: RawWebhook) -> Result<()> {
+        info!("Handling Webhook: {}", raw_webhook.guid);
+
+        if raw_webhook.check_signature(self.secret.as_deref().map(str::as_bytes)) {
+            info!("Signature check PASSED!");
+        } else {
+            warn!("Signature check FAILED! Skipping Event.");
+            return Ok(());
+        }
+
+        let webhook = raw_webhook.to_webhook()?;
         for service in self.services.iter() {
             if service.route(&webhook) {
                 service.handle(&webhook).await;
@@ -161,7 +183,7 @@ impl Server {
     }
 }
 
-async fn webhook_from_request(request: Request<Body>) -> Result<Webhook> {
+async fn webhook_from_request(request: Request<Body>) -> Result<RawWebhook> {
     // Webhooks from github should only contain json payloads
     match request.headers().get(CONTENT_TYPE).map(HeaderValue::to_str) {
         Some(Ok("application/json")) => {}
@@ -209,10 +231,8 @@ async fn webhook_from_request(request: Request<Body>) -> Result<Webhook> {
     };
 
     let body = body::to_bytes(request.into_body()).await?;
-    let event = Event::from_json(&event_type, &body)?;
 
-    Ok(Webhook {
-        event,
+    Ok(RawWebhook {
         event_type,
         guid,
         signature,
@@ -230,7 +250,7 @@ mod test {
         static PAYLOAD: &str = include_str!("../test-input/pull-request-event-payload");
         let request = request_from_raw_http(PAYLOAD);
 
-        let mut service = Server::new(vec![]);
+        let mut service = Server::new(vec![], None);
 
         let resp = service.route_github(request).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
