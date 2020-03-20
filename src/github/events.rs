@@ -259,6 +259,62 @@ impl Event {
         };
         Ok(event)
     }
+
+    pub fn event_type(&self) -> EventType {
+        match &self {
+            Event::CheckRun(_) => EventType::CheckRun,
+            Event::CheckSuite(_) => EventType::CheckSuite,
+            Event::CommitComment => EventType::CommitComment,
+            Event::ContentReference => EventType::ContentReference,
+            Event::Create => EventType::Create,
+            Event::Delete => EventType::Delete,
+            Event::DeployKey => EventType::DeployKey,
+            Event::Deployment => EventType::Deployment,
+            Event::DeploymentStatus => EventType::DeploymentStatus,
+            Event::Download => EventType::Download,
+            Event::Follow => EventType::Follow,
+            Event::Fork => EventType::Fork,
+            Event::ForkApply => EventType::ForkApply,
+            Event::GithubAppAuthorization => EventType::GithubAppAuthorization,
+            Event::Gist => EventType::Gist,
+            Event::Gollum => EventType::Gollum,
+            Event::Installation => EventType::Installation,
+            Event::InstallationRepositories => EventType::InstallationRepositories,
+            Event::IssueComment(_) => EventType::IssueComment,
+            Event::Issues(_) => EventType::Issues,
+            Event::Label => EventType::Label,
+            Event::MarketplacePurchase => EventType::MarketplacePurchase,
+            Event::Member => EventType::Member,
+            Event::Membership => EventType::Membership,
+            Event::Meta => EventType::Meta,
+            Event::Milestone => EventType::Milestone,
+            Event::Organization => EventType::Organization,
+            Event::OrgBlock => EventType::OrgBlock,
+            Event::Package => EventType::Package,
+            Event::PageBuild => EventType::PageBuild,
+            Event::Ping(_) => EventType::Ping,
+            Event::ProjectCard => EventType::ProjectCard,
+            Event::ProjectColumn => EventType::ProjectColumn,
+            Event::Project => EventType::Project,
+            Event::Public => EventType::Public,
+            Event::PullRequest(_) => EventType::PullRequest,
+            Event::PullRequestReview(_) => EventType::PullRequestReview,
+            Event::PullRequestReviewComment(_) => EventType::PullRequestReviewComment,
+            Event::Push => EventType::Push,
+            Event::RegistryPackage => EventType::RegistryPackage,
+            Event::Release => EventType::Release,
+            Event::Repository => EventType::Repository,
+            Event::RepositoryDispatch => EventType::RepositoryDispatch,
+            Event::RepositoryImport => EventType::RepositoryImport,
+            Event::RepositoryVulnerabilityAlert => EventType::RepositoryVulnerabilityAlert,
+            Event::SecurityAdvisory => EventType::SecurityAdvisory,
+            Event::Star => EventType::Star,
+            Event::Status(_) => EventType::Status,
+            Event::Team => EventType::Team,
+            Event::TeamAdd => EventType::TeamAdd,
+            Event::Watch => EventType::Watch,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
