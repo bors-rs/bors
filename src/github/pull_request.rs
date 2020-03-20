@@ -1,7 +1,7 @@
 use super::{DateTime, Label, Milestone, NodeId, Oid, Repository, Team, User};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CommitRef {
     pub label: String,
     #[serde(rename = "ref")]
@@ -11,7 +11,7 @@ pub struct CommitRef {
     pub repo: Repository,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct PullRequest {
     pub url: String,
     pub id: u64,
@@ -61,7 +61,7 @@ pub struct PullRequest {
     pub changed_files: Option<u64>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Review {
     pub id: u64,
     pub node_id: NodeId,
@@ -82,7 +82,7 @@ impl Review {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct ReviewComment {
     pub url: String,
     pub id: u64,

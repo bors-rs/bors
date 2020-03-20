@@ -2,7 +2,7 @@ use super::{DateTime, EventType, NodeId, Oid, User};
 use serde::Deserialize;
 use std::collections::HashMap;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Annotation {
     pub path: String,
     pub start_line: u64,
@@ -15,14 +15,14 @@ pub struct Annotation {
     pub raw_details: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Image {
     pub alt: String,
     pub image_url: String,
     pub caption: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Conclusion {
     Success,
@@ -33,7 +33,7 @@ pub enum Conclusion {
     ActionRequired,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CheckStatus {
     Queued,
@@ -41,7 +41,7 @@ pub enum CheckStatus {
     Completed,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CheckOutput {
     pub title: Option<String>,
     pub summary: Option<String>,
@@ -53,7 +53,7 @@ pub struct CheckOutput {
 }
 
 // Maybe rename these?
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CheckPullRequest {
     url: String,
     id: u64,
@@ -62,7 +62,7 @@ pub struct CheckPullRequest {
     base: CheckBranch,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CheckBranch {
     #[serde(rename = "ref")]
     git_ref: String,
@@ -70,14 +70,14 @@ pub struct CheckBranch {
     repo: CheckRepo,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CheckRepo {
     id: u64,
     url: String,
     name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CheckRun {
     pub id: u64,
     pub head_sha: Oid,
@@ -97,7 +97,7 @@ pub struct CheckRun {
     pub pull_requests: Vec<CheckPullRequest>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct App {
     pub id: u64,
     pub slug: String,
@@ -113,7 +113,7 @@ pub struct App {
     pub events: Vec<EventType>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CheckSuite {
     pub id: u64,
     pub node_id: NodeId,

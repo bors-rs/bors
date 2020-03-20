@@ -1,13 +1,13 @@
 use super::NodeId;
 use serde::Deserialize;
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 pub enum UserType {
     Organization,
     User,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct User {
     pub login: String,
     pub id: u64,
@@ -30,7 +30,7 @@ pub struct User {
     pub site_admin: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Team {
     id: u64,
     node_id: NodeId,
@@ -46,7 +46,7 @@ pub struct Team {
     parent: Option<Box<Team>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Pusher {
     name: String,
     email: String,

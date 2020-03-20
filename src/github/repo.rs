@@ -1,7 +1,7 @@
 use super::{DateTime, NodeId, Oid, User};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Repository {
     pub id: u64,
     pub node_id: NodeId,
@@ -80,14 +80,14 @@ pub struct Repository {
     // source: Option<Box<Repository>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Author {
     pub name: String,
     pub email: String,
     pub username: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Commit {
     pub id: Oid,
     pub tree_id: Oid,

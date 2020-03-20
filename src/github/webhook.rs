@@ -2,7 +2,7 @@ use super::{Event, EventType};
 use bytes::Bytes;
 use log::{debug, warn};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Webhook {
     pub event: Event,
     pub event_type: EventType,

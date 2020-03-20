@@ -6,7 +6,7 @@ use serde::{de, Deserialize};
 use std::str::FromStr;
 use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum EventType {
     CheckRun,
     CheckSuite,
@@ -140,7 +140,7 @@ impl<'de> Deserialize<'de> for EventType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum Event {
     CheckRun(CheckRunEvent),
@@ -261,7 +261,7 @@ impl Event {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 /// The action that was performed. Can be one of assigned, unassigned, review_requested,
 /// review_request_removed, labeled, unlabeled, opened, edited, closed, ready_for_review, locked,
@@ -284,7 +284,7 @@ pub enum PullRequestEventAction {
     Unlocked,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct PullRequestEvent {
     pub action: PullRequestEventAction,
     pub number: u64,
@@ -293,7 +293,7 @@ pub struct PullRequestEvent {
     pub sender: User,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PullRequestReviewEventAction {
     Submitted,
@@ -311,7 +311,7 @@ impl PullRequestReviewEventAction {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct PullRequestReviewEvent {
     pub action: PullRequestReviewEventAction,
     pub review: Review,
@@ -320,7 +320,7 @@ pub struct PullRequestReviewEvent {
     pub sender: User,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PullRequestReviewCommentEventAction {
     Created,
@@ -338,7 +338,7 @@ impl PullRequestReviewCommentEventAction {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct PullRequestReviewCommentEvent {
     pub action: PullRequestReviewCommentEventAction,
     pub comment: ReviewComment,
@@ -347,7 +347,7 @@ pub struct PullRequestReviewCommentEvent {
     pub sender: User,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct PushEvent {
     #[serde(rename = "ref")]
     pub git_ref: String,
@@ -365,7 +365,7 @@ pub struct PushEvent {
     pub sender: User,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CheckRunEventAction {
     Created,
@@ -374,12 +374,12 @@ pub enum CheckRunEventAction {
     RequestedAction,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct RequestedAction {
     pub identifier: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CheckRunEvent {
     pub action: CheckRunEventAction,
     pub check_run: CheckRun,
@@ -388,7 +388,7 @@ pub struct CheckRunEvent {
     pub sender: User,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CheckSuiteEventAction {
     Completed,
@@ -396,7 +396,7 @@ pub enum CheckSuiteEventAction {
     Rerequested,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CheckSuiteEvent {
     pub action: CheckSuiteEventAction,
     pub check_suite: CheckSuite,
@@ -404,7 +404,7 @@ pub struct CheckSuiteEvent {
     pub sender: User,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IssueCommentEventAction {
     Created,
@@ -422,7 +422,7 @@ impl IssueCommentEventAction {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct IssueCommentEvent {
     pub action: IssueCommentEventAction,
     // changes: // If action is Edited
@@ -432,7 +432,7 @@ pub struct IssueCommentEvent {
     pub sender: User,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IssueEventAction {
     Opened,
@@ -453,7 +453,7 @@ pub enum IssueEventAction {
     Demilestoned,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct IssueEvent {
     pub action: IssueEventAction,
     // changes: // If action is Edited
@@ -464,7 +464,7 @@ pub struct IssueEvent {
     pub sender: User,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StatusEventState {
     Pending,
@@ -473,7 +473,7 @@ pub enum StatusEventState {
     Error,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct StatusEvent {
     pub sha: Oid,
     pub state: StatusEventState,
@@ -483,7 +483,7 @@ pub struct StatusEvent {
     // commit: ???,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct PingEvent {
     pub zen: String,
     pub hook_id: u64,

@@ -1,13 +1,13 @@
 use serde::{de, Deserialize};
 use std::fmt;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct NodeId(String);
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Oid(String);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DateTime(String);
 
 // DateTime's from Github can either be in unix epoch time or a string format

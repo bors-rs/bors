@@ -1,7 +1,7 @@
 use super::{DateTime, NodeId, Repository, User};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Issue {
     pub id: u64,
     pub node_id: NodeId,
@@ -36,7 +36,7 @@ impl Issue {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct PullRequestRef {
     pub url: String,
     pub html_url: String,
@@ -44,7 +44,7 @@ pub struct PullRequestRef {
     pub patch_url: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Milestone {
     pub url: String,
     pub html_url: String,
@@ -64,7 +64,7 @@ pub struct Milestone {
     pub due_on: DateTime,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Comment {
     pub id: u64,
     pub node_id: NodeId,
@@ -82,7 +82,7 @@ impl Comment {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Label {
     pub id: u64,
     pub node_id: NodeId,
