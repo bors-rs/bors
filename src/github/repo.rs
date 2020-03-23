@@ -71,7 +71,7 @@ pub struct Repository {
     pub archived: bool,
     pub disabled: bool,
     pub open_issues_count: u64,
-    pub license: Option<String>,
+    pub license: Option<License>,
     pub forks: u64,
     pub open_issues: u64,
     pub watchers: u64,
@@ -103,6 +103,15 @@ pub struct Commit {
     pub removed: Vec<String>,
     /// List of modified files
     pub modified: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct License {
+    pub key: String,
+    pub name: String,
+    pub node_id: NodeId,
+    pub spdx_id: String,
+    pub url: String,
 }
 
 #[cfg(test)]
