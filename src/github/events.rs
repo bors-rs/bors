@@ -336,6 +336,8 @@ pub enum PullRequestEventAction {
     Reopened,
     Synchronize,
     ReadyForReview,
+    ReviewRequest,
+    ReviewRequestRemoved,
     Locked,
     Unlocked,
 }
