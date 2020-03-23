@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 pub enum UserType {
+    Bot,
     Organization,
     User,
 }
