@@ -1,4 +1,4 @@
-use super::{DateTime, NodeId, Oid, User};
+use super::{DateTime, License, NodeId, Oid, User};
 use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -103,15 +103,6 @@ pub struct Commit {
     pub removed: Vec<String>,
     /// List of modified files
     pub modified: Vec<String>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct License {
-    pub key: String,
-    pub name: String,
-    pub node_id: NodeId,
-    pub spdx_id: String,
-    pub url: String,
 }
 
 #[cfg(test)]
