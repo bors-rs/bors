@@ -4,8 +4,10 @@ use log::debug;
 use reqwest::{header, Client as ReqwestClient, Method, RequestBuilder};
 
 mod error;
+mod license;
 
 pub use error::{Error, Result};
+pub use license::LicenseClient;
 
 // Constants
 const DEFAULT_BASE_URL: &str = "https://api.github.com/";
@@ -169,6 +171,10 @@ impl Client {
                 .into())
             }
         }
+    }
+
+    pub fn licenses(&self) -> LicenseClient {
+        LicenseClient::new(&self)
     }
 }
 
