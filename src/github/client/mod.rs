@@ -5,9 +5,11 @@ use reqwest::{header, Client as ReqwestClient, Method, RequestBuilder};
 
 mod error;
 mod license;
+mod markdown;
 
 pub use error::{Error, Result};
 pub use license::LicenseClient;
+pub use markdown::MarkdownClient;
 
 // Constants
 const DEFAULT_BASE_URL: &str = "https://api.github.com/";
@@ -175,6 +177,10 @@ impl Client {
 
     pub fn licenses(&self) -> LicenseClient {
         LicenseClient::new(&self)
+    }
+
+    pub fn markdown(&self) -> MarkdownClient {
+        MarkdownClient::new(&self)
     }
 }
 
