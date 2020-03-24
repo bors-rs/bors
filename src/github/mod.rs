@@ -3,6 +3,7 @@
 //! https://developer.github.com/v3/
 
 mod check;
+mod client; //TODO Maybe hide with a feature?
 mod common;
 mod events;
 mod hook;
@@ -14,6 +15,7 @@ mod user;
 mod webhook;
 
 pub use check::*;
+pub use client::Client;
 pub use common::*;
 pub use events::*;
 pub use hook::*;
