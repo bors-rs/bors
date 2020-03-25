@@ -20,8 +20,8 @@ jobs:
             - name: Add clippy and fmt components
               run: rustup component add clippy rustfmt
             - name: Lint
-              run: cargo fmt -- --check && cargo clippy
+              run: cargo fmt --all -- --check && cargo clippy --all
             - name: Build
-              run: cargo build
+              run: cargo build --all
             - name: Run tests
-              run: cargo test
+              run: cargo test --all
