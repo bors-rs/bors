@@ -202,20 +202,23 @@ impl Pagination {
                 continue;
             }
 
-            // Check if href segment is well formed and pull out the page number
-            let page = if segments[0].starts_with('<') && segments[0].ends_with('>') {
+            // Check if href segment is well formed and a valid url format
+            let url = if segments[0].starts_with('<') && segments[0].ends_with('>') {
                 if let Ok(url) = Url::parse(&segments[0][1..segments[0].len() - 1]) {
-                    if let Some(page) =
-                        url.query_pairs()
-                            .find_map(|(k, v)| if k == "page" { Some(v) } else { None })
-                    {
-                        page.into_owned()
-                    } else {
-                        continue;
-                    }
+                    url
                 } else {
                     continue;
                 }
+            } else {
+                continue;
+            };
+
+            // and then pull out the page number
+            let page = if let Some(page) =
+                url.query_pairs()
+                    .find_map(|(k, v)| if k == "page" { Some(v) } else { None })
+            {
+                page
             } else {
                 continue;
             };
@@ -226,7 +229,7 @@ impl Pagination {
                         if let Ok(n) = page.parse() {
                             pagination.next_page = Some(n);
                         } else {
-                            pagination.next_page_token = Some(page.clone());
+                            pagination.next_page_token = Some(page.clone().into_owned());
                         }
                     }
                     "rel=\"prev\"" => {
