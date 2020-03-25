@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use log::debug;
 use reqwest::{header, Client as ReqwestClient, Method, RequestBuilder};
 use url::Url;
 
@@ -138,6 +137,41 @@ const MEDIA_TYPE_MULTI_LINE_COMMENTS_PREVIEW: &str =
 
 // https://developer.github.com/changes/2019-11-05-deprecated-passwords-and-authorizations-api/
 const MEDIA_TYPE_O_AUTH_APP_PREVIEW: &str = "application/vnd.github.doctor-strange-preview+json";
+
+#[derive(Debug)]
+pub struct Response<T> {
+    pagination: Pagination,
+
+    rate: Rate,
+
+    inner: T,
+}
+
+impl<T> Response<T> {
+    pub fn new(pagination: Pagination, rate: Rate, inner: T) -> Self {
+        Self {
+            pagination,
+            rate,
+            inner,
+        }
+    }
+
+    pub fn pagination(&self) -> &Pagination {
+        &self.pagination
+    }
+
+    pub fn rate(&self) -> &Rate {
+        &self.rate
+    }
+
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+
+    pub fn into_parts(self) -> (Pagination, Rate, T) {
+        (self.pagination, self.rate, self.inner)
+    }
+}
 
 /// Represents `Pagination` information from a Github API request
 #[derive(Debug, Default)]
@@ -357,53 +391,31 @@ impl Client {
         self.client.request(method, &url)
     }
 
-    fn check_response(&self, response: &reqwest::Response) -> Result<()> {
-        debug!("Github Response: {:#?}", response);
-
+    fn check_response(&self, response: &reqwest::Response) -> Result<(Pagination, Rate)> {
         if !response.status().is_success() {
             //TODO Better handling of these failure payloads
-            Err(format!("Request failed: {}", response.status()).into())
-        } else {
-            Ok(())
+            return Err(format!("Request failed: {}", response.status()).into());
         }
+
+        let pagination = Pagination::from_headers(response.headers());
+        let rate = Rate::from_headers(response.headers());
+
+        Ok((pagination, rate))
     }
 
-    // Process a response recieved from Github. This checks for things like hitting rate limits,
-    // etc., and then deserializes the json response.
-    async fn process_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
+    async fn json<T: serde::de::DeserializeOwned>(
         &self,
         response: reqwest::Response,
-    ) -> Result<T> {
-        debug!("Github Response: {:#?}", response);
+    ) -> Result<Response<T>> {
+        let (pagination, rate) = self.check_response(&response)?;
+        let json = response.json().await?;
+        Ok(Response::new(pagination, rate, json))
+    }
 
-        if !response.status().is_success() {
-            //TODO Better handling of these failure payloads
-            return Err(format!(
-                "Request failed: {}",
-                serde_json::to_string_pretty(&response.json::<serde_json::Value>().await?)?
-            )
-            .into());
-        }
-
-        let payload = response.text().await?;
-
-        //TODO fix this mess
-        match serde_json::from_str(&payload) {
-            Ok(t) => Ok(t),
-            Err(_) => {
-                let pretty_json = serde_json::to_string_pretty(&serde_json::from_str::<
-                    serde_json::Value,
-                >(&payload)?)?;
-                Err(format!(
-                    "Error deserializing: {}\nContent: {}",
-                    serde_json::from_str::<T>(&pretty_json)
-                        .unwrap_err()
-                        .to_string(),
-                    pretty_json,
-                )
-                .into())
-            }
-        }
+    async fn text(&self, response: reqwest::Response) -> Result<Response<String>> {
+        let (pagination, rate) = self.check_response(&response)?;
+        let text = response.text().await?;
+        Ok(Response::new(pagination, rate, text))
     }
 
     pub fn licenses(&self) -> LicenseClient {

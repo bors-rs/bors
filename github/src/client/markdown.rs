@@ -1,4 +1,4 @@
-use crate::client::{Client, Result};
+use crate::client::{Client, Response, Result};
 use serde::Serialize;
 
 #[derive(Clone, Debug, Serialize)]
@@ -32,7 +32,7 @@ impl<'a> MarkdownClient<'a> {
     /// Render a Markdown document
     ///
     /// https://developer.github.com/v3/markdown/#render-an-arbitrary-markdown-document
-    pub async fn render(&self, text: String) -> Result<String> {
+    pub async fn render(&self, text: String) -> Result<Response<String>> {
         let request = MarkdownRequest {
             text,
             mode: Mode::Markdown,
@@ -40,15 +40,18 @@ impl<'a> MarkdownClient<'a> {
         };
 
         let response = self.inner.post("markdown").json(&request).send().await?;
-        self.inner.check_response(&response)?;
-        Ok(response.text().await?)
+        self.inner.text(response).await
     }
 
     /// Render a Github Flavored Markdown document
     /// Optional repository context can be provided: `Some("owner", "repo")`
     ///
     /// https://developer.github.com/v3/markdown/#render-an-arbitrary-markdown-document
-    pub async fn render_gfm(&self, text: String, context: Option<(&str, &str)>) -> Result<String> {
+    pub async fn render_gfm(
+        &self,
+        text: String,
+        context: Option<(&str, &str)>,
+    ) -> Result<Response<String>> {
         let context = context.map(|ctx| format!("{}/{}", ctx.0, ctx.1));
         let request = MarkdownRequest {
             text,
@@ -57,7 +60,6 @@ impl<'a> MarkdownClient<'a> {
         };
 
         let response = self.inner.post("markdown").json(&request).send().await?;
-        self.inner.check_response(&response)?;
-        Ok(response.text().await?)
+        self.inner.text(response).await
     }
 }
