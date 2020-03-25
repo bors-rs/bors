@@ -2,6 +2,7 @@
 
 use log::debug;
 use reqwest::{header, Client as ReqwestClient, Method, RequestBuilder};
+use url::Url;
 
 mod error;
 mod license;
@@ -20,6 +21,7 @@ const HEADER_RATE_LIMIT: &str = "X-RateLimit-Limit";
 const HEADER_RATE_REMAINING: &str = "X-RateLimit-Remaining";
 const HEADER_RATE_RESET: &str = "X-RateLimit-Reset";
 const HEADER_OTP: &str = "X-GitHub-OTP";
+const HEADER_LINK: &str = "Link";
 
 const MEDIA_TYPE_V3: &str = "application/vnd.github.v3+json";
 const DEFAULT_MEDIA_TYPE: &str = "application/octet-stream";
@@ -136,6 +138,119 @@ const MEDIA_TYPE_MULTI_LINE_COMMENTS_PREVIEW: &str =
 
 // https://developer.github.com/changes/2019-11-05-deprecated-passwords-and-authorizations-api/
 const MEDIA_TYPE_O_AUTH_APP_PREVIEW: &str = "application/vnd.github.doctor-strange-preview+json";
+
+/// Represents `Pagination` information from a Github API request
+#[derive(Debug, Default)]
+pub struct Pagination {
+    pub next_page: Option<usize>,
+    pub prev_page: Option<usize>,
+    pub first_page: Option<usize>,
+    pub last_page: Option<usize>,
+
+    pub next_page_token: Option<String>,
+}
+
+impl Pagination {
+    fn from_headers(headers: &reqwest::header::HeaderMap) -> Self {
+        let mut pagination = Self::default();
+
+        let links = if let Some(links) = headers.get(HEADER_LINK).and_then(|h| h.to_str().ok()) {
+            links
+        } else {
+            return pagination;
+        };
+
+        for link in links.split(',') {
+            let segments: Vec<&str> = link.split(';').map(str::trim).collect();
+
+            // Skip if we don't at least have href and rel
+            if segments.len() < 2 {
+                continue;
+            }
+
+            // Check if href segment is well formed and pull out the page number
+            let page = if segments[0].starts_with('<') && segments[0].ends_with('>') {
+                if let Ok(url) = Url::parse(&segments[0][1..segments[0].len() - 1]) {
+                    if let Some(page) =
+                        url.query_pairs()
+                            .find_map(|(k, v)| if k == "page" { Some(v) } else { None })
+                    {
+                        page.into_owned()
+                    } else {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+            } else {
+                continue;
+            };
+
+            for rel in &segments[1..] {
+                match rel.trim() {
+                    "rel=\"next\"" => {
+                        if let Ok(n) = page.parse() {
+                            pagination.next_page = Some(n);
+                        } else {
+                            pagination.next_page_token = Some(page.clone());
+                        }
+                    }
+                    "rel=\"prev\"" => {
+                        pagination.prev_page = page.parse().ok();
+                    }
+                    "rel=\"first\"" => {
+                        pagination.first_page = page.parse().ok();
+                    }
+                    "rel=\"last\"" => {
+                        pagination.last_page = page.parse().ok();
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        pagination
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct Rate {
+    limit: usize,
+    remaining: usize,
+    reset: usize, //TODO fix this to be UTC epoch seconds
+}
+
+impl Rate {
+    fn from_headers(headers: &reqwest::header::HeaderMap) -> Self {
+        let mut rate = Self::default();
+
+        if let Some(limit) = headers
+            .get(HEADER_RATE_LIMIT)
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.parse().ok())
+        {
+            rate.limit = limit;
+        };
+
+        if let Some(remaining) = headers
+            .get(HEADER_RATE_REMAINING)
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.parse().ok())
+        {
+            rate.remaining = remaining;
+        };
+
+        if let Some(reset) = headers
+            .get(HEADER_RATE_RESET)
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.parse().ok())
+        {
+            rate.reset = reset;
+        };
+
+        rate
+    }
+}
 
 #[derive(Debug)]
 pub struct ClientBuilder {
@@ -303,5 +418,37 @@ impl Client {
 impl Default for Client {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{
+        Pagination, Rate, HEADER_LINK, HEADER_RATE_LIMIT, HEADER_RATE_REMAINING, HEADER_RATE_RESET,
+    };
+    use reqwest::header::HeaderMap;
+
+    #[test]
+    fn pagination() {
+        let mut headers = HeaderMap::new();
+        let link = r#"<https://api.github.com/user/repos?page=3&per_page=100>; rel="next", <https://api.github.com/user/repos?page=50&per_page=100>; rel="last""#;
+        headers.insert(HEADER_LINK, link.parse().unwrap());
+
+        let p = Pagination::from_headers(&headers);
+        assert_eq!(p.next_page, Some(3));
+        assert_eq!(p.last_page, Some(50));
+    }
+
+    #[test]
+    fn rate() {
+        let mut headers = HeaderMap::new();
+        headers.insert(HEADER_RATE_LIMIT, "60".parse().unwrap());
+        headers.insert(HEADER_RATE_REMAINING, "56".parse().unwrap());
+        headers.insert(HEADER_RATE_RESET, "1372700873".parse().unwrap());
+
+        let r = Rate::from_headers(&headers);
+        assert_eq!(r.limit, 60);
+        assert_eq!(r.remaining, 56);
+        assert_eq!(r.reset, 1372700873);
     }
 }
