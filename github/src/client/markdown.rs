@@ -1,4 +1,4 @@
-use crate::github::client::{Client, Result};
+use crate::client::{Client, Result};
 use serde::Serialize;
 
 #[derive(Clone, Debug, Serialize)]

@@ -1,4 +1,4 @@
-use crate::github::Webhook;
+use github::Webhook;
 use std::fmt::Debug;
 
 //TODO maybe don't need the route function?

@@ -1,4 +1,4 @@
-use crate::github::{
+use crate::{
     client::{Client, Result},
     License, RepositoryLicense,
 };

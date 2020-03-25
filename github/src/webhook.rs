@@ -1,3 +1,6 @@
+//TODO Now that these types are in their own crate the types for Webhook and RawWebhook need to be
+// refined.
+
 use super::{Event, EventType};
 use bytes::Bytes;
 use log::{debug, warn};
@@ -9,7 +12,7 @@ pub struct Webhook {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct RawWebhook {
+pub struct RawWebhook {
     pub event_type: EventType,
     pub guid: String,
     pub signature: Option<String>,

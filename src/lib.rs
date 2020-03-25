@@ -2,7 +2,6 @@ mod command;
 mod config;
 mod error;
 mod event_processor;
-pub mod github;
 mod graphql;
 mod probot;
 mod service;

@@ -1,5 +1,4 @@
 use crate::{
-    github::{EventType, RawWebhook},
     probot::{service::Service, smee_client::SmeeClient},
     Error, Result,
 };
@@ -7,6 +6,7 @@ use futures::{
     future::{self, FutureExt, TryFutureExt},
     try_join,
 };
+use github::{EventType, RawWebhook};
 use hyper::{
     body,
     header::{HeaderValue, CONTENT_LENGTH, CONTENT_TYPE},

@@ -1,9 +1,6 @@
-use crate::{
-    github::{EventType, RawWebhook},
-    probot::Server,
-    Result,
-};
+use crate::{probot::Server, Result};
 use bytes::{Buf, Bytes, BytesMut};
+use github::{EventType, RawWebhook};
 use hyper::{body::HttpBody, Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use log::{debug, info};
