@@ -7,10 +7,12 @@ use url::Url;
 mod error;
 mod license;
 mod markdown;
+mod reactions;
 
 pub use error::{Error, Result};
 pub use license::LicenseClient;
 pub use markdown::MarkdownClient;
+pub use reactions::ReactionsClient;
 
 // Constants
 const DEFAULT_BASE_URL: &str = "https://api.github.com/";
@@ -394,6 +396,10 @@ impl Client {
         ClientBuilder::new()
     }
 
+    fn delete(&self, url: &str) -> RequestBuilder {
+        self.request(Method::DELETE, url)
+    }
+
     fn get(&self, url: &str) -> RequestBuilder {
         self.request(Method::GET, url)
     }
@@ -419,6 +425,11 @@ impl Client {
         Ok((pagination, rate))
     }
 
+    fn empty(&self, response: reqwest::Response) -> Result<Response<()>> {
+        let (pagination, rate) = self.check_response(&response)?;
+        Ok(Response::new(pagination, rate, ()))
+    }
+
     async fn json<T: serde::de::DeserializeOwned>(
         &self,
         response: reqwest::Response,
@@ -440,6 +451,10 @@ impl Client {
 
     pub fn markdown(&self) -> MarkdownClient {
         MarkdownClient::new(&self)
+    }
+
+    pub fn reactions(&self) -> ReactionsClient {
+        ReactionsClient::new(&self)
     }
 }
 
