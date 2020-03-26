@@ -1,4 +1,4 @@
-use super::{DateTime, NodeId, Repository, User};
+use super::{DateTime, NodeId, ReactionSummary, Repository, User};
 use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -20,6 +20,7 @@ pub struct Issue {
     pub assignee: Option<User>,
     pub assignees: Vec<User>,
     pub milestone: Option<Milestone>,
+    pub reactions: Option<ReactionSummary>,
     pub locked: bool,
     pub active_lock_reason: Option<String>,
     pub comments: u64,
@@ -71,6 +72,7 @@ pub struct Comment {
     pub url: String,
     pub html_url: String,
     pub body: Option<String>,
+    pub reactions: Option<ReactionSummary>,
     pub user: User,
     pub created_at: DateTime,
     pub updated_at: DateTime,

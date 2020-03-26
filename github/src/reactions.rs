@@ -25,3 +25,19 @@ pub struct Reaction {
     pub node_id: NodeId,
     pub content: ReactionType,
 }
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ReactionSummary {
+    total_count: usize,
+    #[serde(rename = "+1")]
+    plus_one: usize,
+    #[serde(rename = "-1")]
+    minus_one: usize,
+    laugh: usize,
+    confused: usize,
+    heart: usize,
+    hooray: usize,
+    rocket: usize,
+    eyes: usize,
+    url: String,
+}

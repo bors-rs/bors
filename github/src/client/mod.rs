@@ -5,12 +5,14 @@ use serde::Serialize;
 use url::Url;
 
 mod error;
+mod issues;
 mod license;
 mod markdown;
 mod rate_limit;
 mod reactions;
 
 pub use error::{Error, Result};
+pub use issues::IssuesClient;
 pub use license::LicenseClient;
 pub use markdown::MarkdownClient;
 pub use rate_limit::{Rate, RateLimitClient, RateLimits};
@@ -367,8 +369,16 @@ impl Client {
         self.request(Method::GET, url)
     }
 
+    fn patch(&self, url: &str) -> RequestBuilder {
+        self.request(Method::PATCH, url)
+    }
+
     fn post(&self, url: &str) -> RequestBuilder {
         self.request(Method::POST, url)
+    }
+
+    fn put(&self, url: &str) -> RequestBuilder {
+        self.request(Method::PUT, url)
     }
 
     fn request(&self, method: Method, url: &str) -> RequestBuilder {
@@ -377,12 +387,15 @@ impl Client {
     }
 
     //TODO explicitly check for and construct a RateLimit error when rate limits are hit
+    //TODO explicitly check for an construct an AbuseLimit error
     async fn check_response(
         &self,
         response: reqwest::Response,
     ) -> Result<(reqwest::Response, Pagination, Rate)> {
         if !response.status().is_success() {
             let status = response.status();
+            // BUG: Don't try to look for a payload for all response types
+            // https://developer.github.com/v3/#client-errors
             let msg = response.json().await?;
             return Err(Error::GithubClientError(status, msg));
         }
