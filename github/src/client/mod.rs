@@ -413,20 +413,25 @@ impl Client {
         self.client.request(method, &url)
     }
 
-    fn check_response(&self, response: &reqwest::Response) -> Result<(Pagination, Rate)> {
+    //TODO explicitly check for and construct a RateLimit error when rate limits are hit
+    async fn check_response(
+        &self,
+        response: reqwest::Response,
+    ) -> Result<(reqwest::Response, Pagination, Rate)> {
         if !response.status().is_success() {
-            //TODO Better handling of these failure payloads
-            return Err(format!("Request failed: {}", response.status()).into());
+            let status = response.status();
+            let msg = response.json().await?;
+            return Err(Error::GithubClientError(status, msg));
         }
 
         let pagination = Pagination::from_headers(response.headers());
         let rate = Rate::from_headers(response.headers());
 
-        Ok((pagination, rate))
+        Ok((response, pagination, rate))
     }
 
-    fn empty(&self, response: reqwest::Response) -> Result<Response<()>> {
-        let (pagination, rate) = self.check_response(&response)?;
+    async fn empty(&self, response: reqwest::Response) -> Result<Response<()>> {
+        let (_response, pagination, rate) = self.check_response(response).await?;
         Ok(Response::new(pagination, rate, ()))
     }
 
@@ -434,13 +439,13 @@ impl Client {
         &self,
         response: reqwest::Response,
     ) -> Result<Response<T>> {
-        let (pagination, rate) = self.check_response(&response)?;
+        let (response, pagination, rate) = self.check_response(response).await?;
         let json = response.json().await?;
         Ok(Response::new(pagination, rate, json))
     }
 
     async fn text(&self, response: reqwest::Response) -> Result<Response<String>> {
-        let (pagination, rate) = self.check_response(&response)?;
+        let (response, pagination, rate) = self.check_response(response).await?;
         let text = response.text().await?;
         Ok(Response::new(pagination, rate, text))
     }

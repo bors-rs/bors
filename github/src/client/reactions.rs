@@ -74,7 +74,7 @@ impl<'a> ReactionsClient<'a> {
             .send()
             .await?;
 
-        self.inner.empty(response)
+        self.inner.empty(response).await
     }
 
     /// List the reactions for a commit comment
