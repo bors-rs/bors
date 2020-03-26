@@ -7,11 +7,13 @@ use url::Url;
 mod error;
 mod license;
 mod markdown;
+mod rate_limit;
 mod reactions;
 
 pub use error::{Error, Result};
 pub use license::LicenseClient;
 pub use markdown::MarkdownClient;
+pub use rate_limit::{Rate, RateLimitClient, RateLimits};
 pub use reactions::ReactionsClient;
 
 // Constants
@@ -265,45 +267,6 @@ pub struct PaginationCursorOptions {
     pub per_page: Option<usize>,
 }
 
-#[derive(Debug, Default)]
-pub struct Rate {
-    limit: usize,
-    remaining: usize,
-    reset: usize, //TODO fix this to be UTC epoch seconds
-}
-
-impl Rate {
-    fn from_headers(headers: &reqwest::header::HeaderMap) -> Self {
-        let mut rate = Self::default();
-
-        if let Some(limit) = headers
-            .get(HEADER_RATE_LIMIT)
-            .and_then(|h| h.to_str().ok())
-            .and_then(|s| s.parse().ok())
-        {
-            rate.limit = limit;
-        };
-
-        if let Some(remaining) = headers
-            .get(HEADER_RATE_REMAINING)
-            .and_then(|h| h.to_str().ok())
-            .and_then(|s| s.parse().ok())
-        {
-            rate.remaining = remaining;
-        };
-
-        if let Some(reset) = headers
-            .get(HEADER_RATE_RESET)
-            .and_then(|h| h.to_str().ok())
-            .and_then(|s| s.parse().ok())
-        {
-            rate.reset = reset;
-        };
-
-        rate
-    }
-}
-
 #[derive(Debug)]
 pub struct ClientBuilder {
     base_url: Option<String>,
@@ -461,6 +424,10 @@ impl Client {
     pub fn reactions(&self) -> ReactionsClient {
         ReactionsClient::new(&self)
     }
+
+    pub fn rate_limit(&self) -> RateLimitClient {
+        RateLimitClient::new(&self)
+    }
 }
 
 impl Default for Client {
@@ -471,9 +438,7 @@ impl Default for Client {
 
 #[cfg(test)]
 mod test {
-    use super::{
-        Pagination, Rate, HEADER_LINK, HEADER_RATE_LIMIT, HEADER_RATE_REMAINING, HEADER_RATE_RESET,
-    };
+    use super::{Pagination, HEADER_LINK};
     use reqwest::header::HeaderMap;
 
     #[test]
@@ -485,18 +450,5 @@ mod test {
         let p = Pagination::from_headers(&headers);
         assert_eq!(p.next_page, Some(3));
         assert_eq!(p.last_page, Some(50));
-    }
-
-    #[test]
-    fn rate() {
-        let mut headers = HeaderMap::new();
-        headers.insert(HEADER_RATE_LIMIT, "60".parse().unwrap());
-        headers.insert(HEADER_RATE_REMAINING, "56".parse().unwrap());
-        headers.insert(HEADER_RATE_RESET, "1372700873".parse().unwrap());
-
-        let r = Rate::from_headers(&headers);
-        assert_eq!(r.limit, 60);
-        assert_eq!(r.remaining, 56);
-        assert_eq!(r.reset, 1372700873);
     }
 }
