@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use reqwest::{header, Client as ReqwestClient, Method, RequestBuilder};
+use serde::Serialize;
 use url::Url;
 
 mod error;
@@ -248,6 +249,18 @@ impl Pagination {
 
         pagination
     }
+}
+
+#[derive(Debug, Default, Serialize)]
+pub struct PaginationOptions {
+    pub page: Option<usize>,
+    pub per_page: Option<usize>,
+}
+
+#[derive(Debug, Default, Serialize)]
+pub struct PaginationCursorOptions {
+    pub page: Option<String>,
+    pub per_page: Option<usize>,
 }
 
 #[derive(Debug, Default)]
