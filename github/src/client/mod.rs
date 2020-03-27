@@ -426,6 +426,40 @@ impl Client {
         Ok(Response::new(pagination, rate, text))
     }
 
+    // TODO: actions endpoint
+    // https://developer.github.com/v3/actions/
+
+    // TODO: activity endpoint
+    // https://developer.github.com/v3/activity/
+
+    // TODO: apps endpoint
+    // https://developer.github.com/v3/apps/
+
+    // TODO checks endpoint
+    // https://developer.github.com/v3/checks/
+
+    // TODO code of conduct endpoint
+    // https://developer.github.com/v3/codes_of_conduct/
+
+    // TODO emojis endpoint
+    // https://developer.github.com/v3/emojis/
+
+    // TODO gists endpoint
+    // https://developer.github.com/v3/gists/
+
+    // TODO git endpoint
+    // https://developer.github.com/v3/git/
+
+    // TODO gitignore endpoint
+    // https://developer.github.com/v3/gitignore/
+
+    // TODO interactions endpoint
+    // https://developer.github.com/v3/interactions/
+
+    pub fn issues(&self) -> IssuesClient {
+        IssuesClient::new(&self)
+    }
+
     pub fn licenses(&self) -> LicenseClient {
         LicenseClient::new(&self)
     }
@@ -434,13 +468,40 @@ impl Client {
         MarkdownClient::new(&self)
     }
 
-    pub fn reactions(&self) -> ReactionsClient {
-        ReactionsClient::new(&self)
-    }
+    // TODO meta endpoint
+    // https://developer.github.com/v3/meta/
+
+    // TODO migrations endpoint
+    // https://developer.github.com/v3/migrations/
+
+    // TODO orgs endpoint
+    // https://developer.github.com/v3/orgs/
+
+    // TODO projects endpoint
+    // https://developer.github.com/v3/projects/
+
+    // TODO pulls endpoint
+    // https://developer.github.com/v3/pulls/
 
     pub fn rate_limit(&self) -> RateLimitClient {
         RateLimitClient::new(&self)
     }
+
+    pub fn reactions(&self) -> ReactionsClient {
+        ReactionsClient::new(&self)
+    }
+
+    // TODO repos endpoint
+    // https://developer.github.com/v3/repos/
+
+    // TODO search endpoint
+    // https://developer.github.com/v3/search/
+
+    // TODO teams endpoint
+    // https://developer.github.com/v3/teams/
+
+    // TODO users endpoint
+    // https://developer.github.com/v3/users/
 }
 
 impl Default for Client {
