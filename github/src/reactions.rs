@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum ReactionType {
     #[serde(rename = "+1")]
-    PlusOne,
+    ThumbsUp,
     #[serde(rename = "-1")]
-    MinusOne,
+    ThumbsDown,
     Laugh,
     Confused,
     Heart,
@@ -30,14 +30,15 @@ pub struct Reaction {
 pub struct ReactionSummary {
     total_count: usize,
     #[serde(rename = "+1")]
-    plus_one: usize,
+    thumbs_up: usize,
     #[serde(rename = "-1")]
-    minus_one: usize,
+    thumbs_down: usize,
     laugh: usize,
     confused: usize,
     heart: usize,
     hooray: usize,
     rocket: usize,
     eyes: usize,
+
     url: String,
 }

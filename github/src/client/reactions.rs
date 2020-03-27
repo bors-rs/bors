@@ -34,6 +34,58 @@ impl<'a> ReactionsClient<'a> {
         url: &str,
         options: Option<ListReactionsOptions>,
     ) -> Result<Response<Vec<Reaction>>> {
+        // Github takes list options as URL query parameters but seems to not accept reaction
+        // filtering of '+1' or '-1' properly and instead seems to prefer 'thumbs_up' or
+        // 'thumbs_down' instead. Unfortunately this is the only place in their Reactions API that
+        // this is preferred so to work around that we need to internally convert between the
+        // public reaction type and an internal one which will properly serialize to the correct
+        // URL query parameter.
+        #[derive(Debug, Default, Serialize)]
+        struct ListReactionsOptionsInternal {
+            pub content: Option<ListReactionType>,
+
+            #[serde(flatten)]
+            pub pagination_options: PaginationOptions,
+        }
+
+        impl From<ListReactionsOptions> for ListReactionsOptionsInternal {
+            fn from(options: ListReactionsOptions) -> Self {
+                Self {
+                    content: options.content.map(Into::into),
+                    pagination_options: options.pagination_options,
+                }
+            }
+        }
+
+        #[derive(Debug, Serialize)]
+        #[serde(rename_all = "snake_case")]
+        enum ListReactionType {
+            ThumbsUp,
+            ThumbsDown,
+            Laugh,
+            Confused,
+            Heart,
+            Hooray,
+            Rocket,
+            Eyes,
+        }
+
+        impl From<ReactionType> for ListReactionType {
+            fn from(reaction: ReactionType) -> Self {
+                match reaction {
+                    ReactionType::ThumbsUp => ListReactionType::ThumbsUp,
+                    ReactionType::ThumbsDown => ListReactionType::ThumbsDown,
+                    ReactionType::Laugh => ListReactionType::Laugh,
+                    ReactionType::Confused => ListReactionType::Confused,
+                    ReactionType::Heart => ListReactionType::Heart,
+                    ReactionType::Hooray => ListReactionType::Hooray,
+                    ReactionType::Rocket => ListReactionType::Rocket,
+                    ReactionType::Eyes => ListReactionType::Eyes,
+                }
+            }
+        }
+
+        let options = options.map(ListReactionsOptionsInternal::from);
         let response = self
             .inner
             .get(url)
