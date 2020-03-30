@@ -100,9 +100,22 @@ pub struct MergePullRequest {
     /// Extra detail to append to automatic commit message
     commit_message: Option<String>,
     /// Merge method to use. Possible values are merge, squash or rebase
-    merge_method: String, //TODO type
+    merge_method: MergeMethod,
     /// SHA that pull request head must match to allow merge
     sha: String,
+}
+
+#[derive(Debug, Serialize)]
+pub enum MergeMethod {
+    Merge,
+    Squash,
+    Rebase,
+}
+
+impl Default for MergeMethod {
+    fn default() -> Self {
+        MergeMethod::Merge
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]
