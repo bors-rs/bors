@@ -66,10 +66,10 @@ pub struct ListIssuesForRepoOptions {
 
     /// Can be the name of a user. Pass in none for issues with no assigned user, and * for issues
     /// assigned to any user.
-    pub assignee: String, //TODO type
+    pub assignee: String,
 
     /// The user that created the issue.
-    pub creator: String, //TODO type
+    pub creator: String,
 
     /// A user that's mentioned in the issue.
     pub mentioned: String,
@@ -179,7 +179,7 @@ impl<'a> IssuesClient<'a> {
         let response = self
             .inner
             .get(url)
-            // TODO: remove custom Accept headers when APIs fully launch.
+            // For the 'performed_via_github_app' object in the response
             .header(reqwest::header::ACCEPT, MEDIA_TYPE_INTEGRATION_PREVIEW)
             // For the 'reactions' object in an Issue
             .header(reqwest::header::ACCEPT, MEDIA_TYPE_REACTIONS_PREVIEW)
@@ -241,7 +241,7 @@ impl<'a> IssuesClient<'a> {
         let response = self
             .inner
             .get(&url)
-            // TODO: remove custom Accept headers when APIs fully launch.
+            // For the 'performed_via_github_app' object in the response
             .header(reqwest::header::ACCEPT, MEDIA_TYPE_INTEGRATION_PREVIEW)
             // For the 'reactions' object in an Issue
             .header(reqwest::header::ACCEPT, MEDIA_TYPE_REACTIONS_PREVIEW)
