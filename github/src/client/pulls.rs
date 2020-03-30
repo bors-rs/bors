@@ -5,7 +5,7 @@ use crate::{
         MEDIA_TYPE_MULTI_LINE_COMMENTS_PREVIEW, MEDIA_TYPE_REACTIONS_PREVIEW,
         MEDIA_TYPE_UPDATE_PULL_REQUEST_BRANCH_PREVIEW,
     },
-    PullRequest, Review, ReviewComment, Team, User,
+    DateTime, PullRequest, Review, ReviewComment, Team, User,
 };
 use serde::{Deserialize, Serialize};
 
@@ -155,7 +155,7 @@ pub struct ListReviewCommentsOptions {
     pub direction: SortDirection,
 
     /// Only issues updated at or after this time are returned. This is a timestamp in ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ.
-    pub since: Option<String>, //TODO type
+    pub since: Option<DateTime>,
 
     #[serde(flatten)]
     pub pagination_options: PaginationOptions,

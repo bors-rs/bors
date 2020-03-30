@@ -1,4 +1,4 @@
-use serde::{de, Deserialize};
+use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -8,7 +8,20 @@ pub struct NodeId(String);
 pub struct Oid(String);
 
 #[derive(Clone, Debug)]
-pub struct DateTime(String);
+pub struct DateTime(chrono::DateTime<chrono::Utc>);
+
+impl Serialize for DateTime {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&self.0.to_rfc3339())
+        } else {
+            serializer.serialize_i64(self.0.timestamp())
+        }
+    }
+}
 
 // DateTime's from Github can either be in unix epoch time or a string format
 impl<'de> Deserialize<'de> for DateTime {
@@ -28,15 +41,28 @@ impl<'de> Deserialize<'de> for DateTime {
             where
                 E: de::Error,
             {
-                Ok(DateTime(v.to_owned()))
+                Ok(DateTime(
+                    v.parse().map_err(|e| E::custom(format!("{}", e)))?,
+                ))
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                use chrono::{offset::LocalResult, TimeZone};
+
+                match chrono::Utc.timestamp_opt(v, 0) {
+                    LocalResult::Single(datetime) => Ok(DateTime(datetime)),
+                    _ => Err(E::custom(format!("'{}' is not a legal timestamp", v))),
+                }
             }
 
             fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
-                // TODO actually convert this to a timestamp
-                Ok(DateTime(format!("{}", v)))
+                self.visit_i64(v as i64)
             }
         }
 

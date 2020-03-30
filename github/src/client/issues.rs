@@ -4,7 +4,7 @@ use crate::{
         MEDIA_TYPE_INTEGRATION_PREVIEW, MEDIA_TYPE_LOCK_REASON_PREVIEW,
         MEDIA_TYPE_REACTIONS_PREVIEW,
     },
-    Comment, Issue, Label, State, User,
+    Comment, DateTime, Issue, Label, State, User,
 };
 use serde::Serialize;
 
@@ -32,7 +32,7 @@ pub struct ListIssuesOptions {
     pub direction: SortDirection,
 
     /// Only issues updated at or after this time are returned. This is a timestamp in ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ.
-    pub since: Option<String>, //TODO type
+    pub since: Option<DateTime>,
 
     #[serde(flatten)]
     pub pagination_options: PaginationOptions,
@@ -68,7 +68,7 @@ pub struct ListIssuesForRepoOptions {
     pub direction: SortDirection,
 
     /// Only issues updated at or after this time are returned. This is a timestamp in ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ.
-    pub since: Option<String>, //TODO type
+    pub since: Option<DateTime>,
 
     #[serde(flatten)]
     pub pagination_options: PaginationOptions,
@@ -83,7 +83,7 @@ pub struct ListIssueCommentsOptions {
     pub direction: SortDirection,
 
     /// Only issues updated at or after this time are returned. This is a timestamp in ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ.
-    pub since: Option<String>, //TODO type
+    pub since: Option<DateTime>,
 
     #[serde(flatten)]
     pub pagination_options: PaginationOptions,
