@@ -1,13 +1,12 @@
 #![allow(dead_code)]
 
 use reqwest::{header, Client as ReqwestClient, Method, RequestBuilder};
-use serde::Serialize;
-use url::Url;
 
 mod error;
 mod issues;
 mod license;
 mod markdown;
+mod pagination;
 mod pulls;
 mod rate_limit;
 mod reactions;
@@ -16,6 +15,9 @@ pub use error::{Error, Result};
 pub use issues::IssuesClient;
 pub use license::LicenseClient;
 pub use markdown::MarkdownClient;
+pub use pagination::{
+    Pagination, PaginationCursorOptions, PaginationOptions, SortDirection, SortPages, StateFilter,
+};
 pub use pulls::PullsClient;
 pub use rate_limit::{Rate, RateLimitClient, RateLimits};
 pub use reactions::ReactionsClient;
@@ -180,95 +182,6 @@ impl<T> Response<T> {
     pub fn into_parts(self) -> (Pagination, Rate, T) {
         (self.pagination, self.rate, self.inner)
     }
-}
-
-/// Represents `Pagination` information from a Github API request
-#[derive(Debug, Default)]
-pub struct Pagination {
-    pub next_page: Option<usize>,
-    pub prev_page: Option<usize>,
-    pub first_page: Option<usize>,
-    pub last_page: Option<usize>,
-
-    pub next_page_token: Option<String>,
-}
-
-impl Pagination {
-    fn from_headers(headers: &reqwest::header::HeaderMap) -> Self {
-        let mut pagination = Self::default();
-
-        let links = if let Some(links) = headers.get(HEADER_LINK).and_then(|h| h.to_str().ok()) {
-            links
-        } else {
-            return pagination;
-        };
-
-        for link in links.split(',') {
-            let segments: Vec<&str> = link.split(';').map(str::trim).collect();
-
-            // Skip if we don't at least have href and rel
-            if segments.len() < 2 {
-                continue;
-            }
-
-            // Check if href segment is well formed and a valid url format
-            let url = if segments[0].starts_with('<') && segments[0].ends_with('>') {
-                if let Ok(url) = Url::parse(&segments[0][1..segments[0].len() - 1]) {
-                    url
-                } else {
-                    continue;
-                }
-            } else {
-                continue;
-            };
-
-            // and then pull out the page number
-            let page = if let Some(page) =
-                url.query_pairs()
-                    .find_map(|(k, v)| if k == "page" { Some(v) } else { None })
-            {
-                page
-            } else {
-                continue;
-            };
-
-            for rel in &segments[1..] {
-                match rel.trim() {
-                    "rel=\"next\"" => {
-                        if let Ok(n) = page.parse() {
-                            pagination.next_page = Some(n);
-                        } else {
-                            pagination.next_page_token = Some(page.clone().into_owned());
-                        }
-                    }
-                    "rel=\"prev\"" => {
-                        pagination.prev_page = page.parse().ok();
-                    }
-                    "rel=\"first\"" => {
-                        pagination.first_page = page.parse().ok();
-                    }
-                    "rel=\"last\"" => {
-                        pagination.last_page = page.parse().ok();
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        pagination
-    }
-}
-
-#[derive(Debug, Default, Serialize)]
-pub struct PaginationOptions {
-    pub page: Option<usize>,
-    pub per_page: Option<usize>,
-}
-
-#[derive(Debug, Default, Serialize)]
-pub struct PaginationCursorOptions {
-    pub page: Option<String>,
-    pub per_page: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -510,22 +423,5 @@ impl Client {
 impl Default for Client {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::{Pagination, HEADER_LINK};
-    use reqwest::header::HeaderMap;
-
-    #[test]
-    fn pagination() {
-        let mut headers = HeaderMap::new();
-        let link = r#"<https://api.github.com/user/repos?page=3&per_page=100>; rel="next", <https://api.github.com/user/repos?page=50&per_page=100>; rel="last""#;
-        headers.insert(HEADER_LINK, link.parse().unwrap());
-
-        let p = Pagination::from_headers(&headers);
-        assert_eq!(p.next_page, Some(3));
-        assert_eq!(p.last_page, Some(50));
     }
 }

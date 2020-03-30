@@ -1,8 +1,9 @@
 use crate::{
     client::{
-        Client, PaginationOptions, Response, Result, MEDIA_TYPE_DRAFT_PREVIEW,
-        MEDIA_TYPE_LOCK_REASON_PREVIEW, MEDIA_TYPE_MULTI_LINE_COMMENTS_PREVIEW,
-        MEDIA_TYPE_REACTIONS_PREVIEW, MEDIA_TYPE_UPDATE_PULL_REQUEST_BRANCH_PREVIEW,
+        Client, PaginationOptions, Response, Result, SortDirection, SortPages, StateFilter,
+        MEDIA_TYPE_DRAFT_PREVIEW, MEDIA_TYPE_LOCK_REASON_PREVIEW,
+        MEDIA_TYPE_MULTI_LINE_COMMENTS_PREVIEW, MEDIA_TYPE_REACTIONS_PREVIEW,
+        MEDIA_TYPE_UPDATE_PULL_REQUEST_BRANCH_PREVIEW,
     },
     PullRequest, Review, ReviewComment, Team, User,
 };
@@ -10,8 +11,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Serialize)]
 pub struct ListPullsOptions {
-    /// Indicates the state of the issues to return. Can be either open, closed, or all. Default: open
-    pub state: String, //TODO type
+    /// Indicates the state of the pull requests to return. Default: open
+    pub state: StateFilter,
 
     /// Filter pulls by head user or head organization and branch name in the format of
     /// user:ref-name or organization:ref-name. For example: github:new-script-format or
@@ -21,11 +22,11 @@ pub struct ListPullsOptions {
     /// Filter pulls by base branch name. Example: gh-pages.
     pub base: String,
 
-    /// What to sort results by. Can be either created, updated, comments. Default: created
-    pub sort: String, //TODO type
+    /// What to sort results by. Default: created
+    pub sort: SortPages,
 
-    /// The direction of the sort. Can be either asc or desc. Default: desc
-    pub direction: String, //TODO type
+    /// The direction of the sort. Default: desc
+    pub direction: SortDirection,
 
     #[serde(flatten)]
     pub pagination_options: PaginationOptions,
@@ -147,11 +148,11 @@ pub struct PullRequestReviewRequest {
 
 #[derive(Debug, Default, Serialize)]
 pub struct ListReviewCommentsOptions {
-    /// What to sort results by. Can be either created, updated, comments. Default: created
-    pub sort: String, //TODO type
+    /// What to sort results by. Default: created
+    pub sort: SortPages,
 
-    /// The direction of the sort. Can be either asc or desc. Default: desc
-    pub direction: String, //TODO type
+    /// The direction of the sort. Default: desc
+    pub direction: SortDirection,
 
     /// Only issues updated at or after this time are returned. This is a timestamp in ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ.
     pub since: String, //TODO type

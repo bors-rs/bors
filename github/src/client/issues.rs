@@ -1,7 +1,8 @@
 use crate::{
     client::{
-        Client, PaginationOptions, Response, Result, MEDIA_TYPE_INTEGRATION_PREVIEW,
-        MEDIA_TYPE_LOCK_REASON_PREVIEW, MEDIA_TYPE_REACTIONS_PREVIEW,
+        Client, PaginationOptions, Response, Result, SortDirection, SortPages, StateFilter,
+        MEDIA_TYPE_INTEGRATION_PREVIEW, MEDIA_TYPE_LOCK_REASON_PREVIEW,
+        MEDIA_TYPE_REACTIONS_PREVIEW,
     },
     Comment, Issue, Label, User,
 };
@@ -18,17 +19,17 @@ pub struct ListIssuesOptions {
     /// Default: assigned
     pub filter: String, //TODO type
 
-    /// Indicates the state of the issues to return. Can be either open, closed, or all. Default: open
-    pub state: String, //TODO type
+    /// Indicates the state of the issues to return. Default: open
+    pub state: StateFilter,
 
     /// A list of comma separated label names. Example: bug,ui,@high
     pub labels: Vec<String>,
 
-    /// What to sort results by. Can be either created, updated, comments. Default: created
-    pub sort: String, //TODO type
+    /// What to sort results by. Default: created
+    pub sort: SortPages,
 
-    /// The direction of the sort. Can be either asc or desc. Default: desc
-    pub direction: String, //TODO type
+    /// The direction of the sort. Default: desc
+    pub direction: SortDirection,
 
     /// Only issues updated at or after this time are returned. This is a timestamp in ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ.
     pub since: String, //TODO type
@@ -44,8 +45,8 @@ pub struct ListIssuesForRepoOptions {
     // without milestones are returned.
     pub milestone: String, //TODO type
 
-    /// Indicates the state of the issues to return. Can be either open, closed, or all. Default: open
-    pub state: String, //TODO type
+    /// Indicates the state of the issues to return. Default: open
+    pub state: StateFilter,
 
     /// Can be the name of a user. Pass in none for issues with no assigned user, and * for issues
     /// assigned to any user.
@@ -60,11 +61,11 @@ pub struct ListIssuesForRepoOptions {
     /// A list of comma separated label names. Example: bug,ui,@high
     pub labels: Vec<String>,
 
-    /// What to sort results by. Can be either created, updated, comments. Default: created
-    pub sort: String, //TODO type
+    /// What to sort results by. Default: created
+    pub sort: SortPages,
 
-    /// The direction of the sort. Can be either asc or desc. Default: desc
-    pub direction: String, //TODO type
+    /// The direction of the sort. Default: desc
+    pub direction: SortDirection,
 
     /// Only issues updated at or after this time are returned. This is a timestamp in ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ.
     pub since: String, //TODO type
@@ -75,11 +76,11 @@ pub struct ListIssuesForRepoOptions {
 
 #[derive(Debug, Default, Serialize)]
 pub struct ListIssueCommentsOptions {
-    /// What to sort results by. Can be either created, updated, comments. Default: created
-    pub sort: String, //TODO type
+    /// What to sort results by. Default: created
+    pub sort: SortPages,
 
-    /// The direction of the sort. Can be either asc or desc. Default: desc
-    pub direction: String, //TODO type
+    /// The direction of the sort. Default: desc
+    pub direction: SortDirection,
 
     /// Only issues updated at or after this time are returned. This is a timestamp in ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ.
     pub since: String, //TODO type
