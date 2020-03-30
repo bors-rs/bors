@@ -155,7 +155,7 @@ pub struct ListReviewCommentsOptions {
     pub direction: SortDirection,
 
     /// Only issues updated at or after this time are returned. This is a timestamp in ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ.
-    pub since: String, //TODO type
+    pub since: Option<String>, //TODO type
 
     #[serde(flatten)]
     pub pagination_options: PaginationOptions,
