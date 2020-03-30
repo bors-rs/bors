@@ -1,4 +1,6 @@
-use super::{DateTime, Label, Milestone, NodeId, Oid, ReactionSummary, Repository, Team, User};
+use super::{
+    DateTime, Label, Milestone, NodeId, Oid, ReactionSummary, Repository, State, Team, User,
+};
 use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -21,7 +23,7 @@ pub struct PullRequest {
     pub patch_url: String,
     pub issue_url: String,
     pub number: u64,
-    pub state: String,
+    pub state: State,
     pub locked: bool,
     pub title: String,
     pub user: User,

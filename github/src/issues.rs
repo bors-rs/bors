@@ -1,5 +1,5 @@
 use super::{DateTime, NodeId, ReactionSummary, Repository, User};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Issue {
@@ -12,7 +12,7 @@ pub struct Issue {
     pub events_url: String,
     pub html_url: String,
     pub number: u64,
-    pub state: String,
+    pub state: State,
     pub title: String,
     pub body: Option<String>,
     pub user: User,
@@ -37,6 +37,13 @@ impl Issue {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum State {
+    Open,
+    Closed,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct PullRequestRef {
     pub url: String,
@@ -53,7 +60,7 @@ pub struct Milestone {
     pub id: u64,
     pub node_id: NodeId,
     pub number: u64,
-    pub state: String,
+    pub state: State,
     pub title: String,
     pub description: Option<String>,
     pub creator: User,

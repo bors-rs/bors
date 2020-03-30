@@ -4,7 +4,7 @@ use crate::{
         MEDIA_TYPE_INTEGRATION_PREVIEW, MEDIA_TYPE_LOCK_REASON_PREVIEW,
         MEDIA_TYPE_REACTIONS_PREVIEW,
     },
-    Comment, Issue, Label, User,
+    Comment, Issue, Label, State, User,
 };
 use serde::Serialize;
 
@@ -95,8 +95,8 @@ pub struct IssueRequest {
     pub title: Option<String>,
     /// The contents of the issue
     pub body: Option<String>,
-    // State of the issue. Either open or closed
-    pub state: Option<String>, //TODO type
+    // State of the issue
+    pub state: Option<State>,
     /// Labels to associate with this issue. Send an empty array ([]) to clear all Labels from the
     /// Issue. NOTE: Only users with push access can set labels for new issues. Labels are silently
     /// dropped otherwise.
