@@ -8,6 +8,7 @@ mod error;
 mod issues;
 mod license;
 mod markdown;
+mod pulls;
 mod rate_limit;
 mod reactions;
 
@@ -15,6 +16,7 @@ pub use error::{Error, Result};
 pub use issues::IssuesClient;
 pub use license::LicenseClient;
 pub use markdown::MarkdownClient;
+pub use pulls::PullsClient;
 pub use rate_limit::{Rate, RateLimitClient, RateLimits};
 pub use reactions::ReactionsClient;
 
@@ -480,8 +482,9 @@ impl Client {
     // TODO projects endpoint
     // https://developer.github.com/v3/projects/
 
-    // TODO pulls endpoint
-    // https://developer.github.com/v3/pulls/
+    pub fn pulls(&self) -> PullsClient {
+        PullsClient::new(&self)
+    }
 
     pub fn rate_limit(&self) -> RateLimitClient {
         RateLimitClient::new(&self)

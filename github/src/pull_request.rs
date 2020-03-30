@@ -1,4 +1,4 @@
-use super::{DateTime, Label, Milestone, NodeId, Oid, Repository, Team, User};
+use super::{DateTime, Label, Milestone, NodeId, Oid, ReactionSummary, Repository, Team, User};
 use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -72,8 +72,8 @@ pub struct Review {
     pub state: String, // Maybe make a type for this
     pub html_url: String,
     pub pull_request_url: String,
-    pub author_association: String,
     // pub _links
+    pub author_association: String, //TODO make a type
 }
 
 impl Review {
@@ -109,6 +109,7 @@ pub struct ReviewComment {
     pub line: Option<u64>,
     pub original_line: Option<u64>,
     pub side: Option<String>,
+    pub reactions: Option<ReactionSummary>,
 }
 
 impl ReviewComment {
