@@ -17,7 +17,7 @@ pub struct ListIssuesOptions {
     /// * subscribed: Issues you're subscribed to updates for
     /// * all: All issues the authenticated user can see, regardless of participation or creation
     /// Default: assigned
-    pub filter: String, //TODO type
+    pub filter: ListIssuesFilter,
 
     /// Indicates the state of the issues to return. Default: open
     pub state: StateFilter,
@@ -38,12 +38,28 @@ pub struct ListIssuesOptions {
     pub pagination_options: PaginationOptions,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ListIssuesFilter {
+    Assigned,
+    Created,
+    Mentioned,
+    Subscribed,
+    All,
+}
+
+impl Default for ListIssuesFilter {
+    fn default() -> Self {
+        ListIssuesFilter::Assigned
+    }
+}
+
 #[derive(Debug, Default, Serialize)]
 pub struct ListIssuesForRepoOptions {
     // If an integer is passed, it should refer to a milestone by its number field. If the string *
     // is passed, issues with any milestone are accepted. If the string none is passed, issues
     // without milestones are returned.
-    pub milestone: String, //TODO type
+    pub milestone: Option<MilestoneFilter>,
 
     /// Indicates the state of the issues to return. Default: open
     pub state: StateFilter,
@@ -72,6 +88,26 @@ pub struct ListIssuesForRepoOptions {
 
     #[serde(flatten)]
     pub pagination_options: PaginationOptions,
+}
+
+#[derive(Debug)]
+pub enum MilestoneFilter {
+    Number(u64),
+    Any,
+    None,
+}
+
+impl Serialize for MilestoneFilter {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        match self {
+            MilestoneFilter::Number(v) => serializer.serialize_u64(*v),
+            MilestoneFilter::Any => serializer.serialize_str("*"),
+            MilestoneFilter::None => serializer.serialize_str("none"),
+        }
+    }
 }
 
 #[derive(Debug, Default, Serialize)]
