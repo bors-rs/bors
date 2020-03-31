@@ -1,4 +1,4 @@
-use super::NodeId;
+use super::{DateTime, NodeId};
 use serde::Deserialize;
 
 #[derive(Clone, Debug, PartialEq, Deserialize)]
@@ -51,6 +51,17 @@ pub struct Team {
 pub struct Pusher {
     name: String,
     email: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Key {
+    id: u64,
+    key: String,
+    url: String,
+    title: String,
+    read_only: bool,
+    created_at: DateTime,
+    verified: bool,
 }
 
 #[cfg(test)]

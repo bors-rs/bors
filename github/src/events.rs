@@ -1,5 +1,5 @@
 use super::{
-    CheckRun, CheckSuite, Comment, Commit, Hook, Issue, Label, Oid, PullRequest, Pusher,
+    CheckRun, CheckSuite, Comment, Commit, Hook, Issue, Key, Label, Oid, PullRequest, Pusher,
     Repository, Review, ReviewComment, User,
 };
 use serde::{de, Deserialize};
@@ -17,12 +17,12 @@ pub enum EventType {
     DeployKey,
     Deployment,
     DeploymentStatus,
-    Download, // Depricated
-    Follow,   // Depricated
+    // DEPRICATED: Download
+    // DEPRICATED: Follow
     Fork,
-    ForkApply, // Depricated
+    // DEPRICATED: ForkApply
     GithubAppAuthorization,
-    Gist, // Depricated
+    // DEPRICATED: Gist
     Gollum,
     Installation,
     InstallationRepositories,
@@ -82,12 +82,8 @@ impl FromStr for EventType {
             "deploy_key" => Ok(DeployKey),
             "deployment" => Ok(Deployment),
             "deployment_status" => Ok(DeploymentStatus),
-            "download" => Ok(Download),
-            "follow" => Ok(Follow),
             "fork" => Ok(Fork),
-            "fork_apply" => Ok(ForkApply),
             "github_app_authorization" => Ok(GithubAppAuthorization),
-            "gist" => Ok(Gist),
             "gollum" => Ok(Gollum),
             "installation" => Ok(Installation),
             "installation_repositories" => Ok(InstallationRepositories),
@@ -145,22 +141,18 @@ impl<'de> Deserialize<'de> for EventType {
 pub enum Event {
     CheckRun(CheckRunEvent),
     CheckSuite(CheckSuiteEvent),
-    CommitComment,
-    ContentReference,
-    Create,
-    Delete,
-    DeployKey,
-    Deployment,
-    DeploymentStatus,
-    Download,
-    Follow,
-    Fork,
-    ForkApply,
-    GithubAppAuthorization,
-    Gist,
-    Gollum,
-    Installation,
-    InstallationRepositories,
+    CommitComment(CommitCommentEvent),
+    ContentReference(ContentReferenceEvent),
+    Create(CreateEvent),
+    Delete(DeleteEvent),
+    DeployKey(DeployKeyEvent),
+    Deployment(DeploymentEvent),
+    DeploymentStatus(DeploymentStatusEvent),
+    Fork(ForkEvent),
+    GithubAppAuthorization(GithubAppAuthorizationEvent),
+    Gollum(GollumEvent),
+    Installation(InstallationEvent),
+    InstallationRepositories(InstallationRepositoriesEvent),
     IssueComment(IssueCommentEvent),
     Issues(IssueEvent),
     Label,
@@ -202,22 +194,22 @@ impl Event {
         let event = match event_type {
             EventType::CheckRun => Event::CheckRun(serde_json::from_slice(json)?),
             EventType::CheckSuite => Event::CheckSuite(serde_json::from_slice(json)?),
-            EventType::CommitComment => Event::CommitComment,
-            EventType::ContentReference => Event::ContentReference,
-            EventType::Create => Event::Create,
-            EventType::Delete => Event::Delete,
-            EventType::DeployKey => Event::DeployKey,
-            EventType::Deployment => Event::Deployment,
-            EventType::DeploymentStatus => Event::DeploymentStatus,
-            EventType::Download => Event::Download,
-            EventType::Follow => Event::Follow,
-            EventType::Fork => Event::Fork,
-            EventType::ForkApply => Event::ForkApply,
-            EventType::GithubAppAuthorization => Event::GithubAppAuthorization,
-            EventType::Gist => Event::Gist,
-            EventType::Gollum => Event::Gollum,
-            EventType::Installation => Event::Installation,
-            EventType::InstallationRepositories => Event::InstallationRepositories,
+            EventType::CommitComment => Event::CommitComment(serde_json::from_slice(json)?),
+            EventType::ContentReference => Event::ContentReference(serde_json::from_slice(json)?),
+            EventType::Create => Event::Create(serde_json::from_slice(json)?),
+            EventType::Delete => Event::Delete(serde_json::from_slice(json)?),
+            EventType::DeployKey => Event::DeployKey(serde_json::from_slice(json)?),
+            EventType::Deployment => Event::Deployment(serde_json::from_slice(json)?),
+            EventType::DeploymentStatus => Event::DeploymentStatus(serde_json::from_slice(json)?),
+            EventType::Fork => Event::Fork(serde_json::from_slice(json)?),
+            EventType::GithubAppAuthorization => {
+                Event::GithubAppAuthorization(serde_json::from_slice(json)?)
+            }
+            EventType::Gollum => Event::Gollum(serde_json::from_slice(json)?),
+            EventType::Installation => Event::Installation(serde_json::from_slice(json)?),
+            EventType::InstallationRepositories => {
+                Event::InstallationRepositories(serde_json::from_slice(json)?)
+            }
             EventType::IssueComment => Event::IssueComment(serde_json::from_slice(json)?),
             EventType::Issues => Event::Issues(serde_json::from_slice(json)?),
             EventType::Label => Event::Label,
@@ -264,22 +256,18 @@ impl Event {
         match &self {
             Event::CheckRun(_) => EventType::CheckRun,
             Event::CheckSuite(_) => EventType::CheckSuite,
-            Event::CommitComment => EventType::CommitComment,
-            Event::ContentReference => EventType::ContentReference,
-            Event::Create => EventType::Create,
-            Event::Delete => EventType::Delete,
-            Event::DeployKey => EventType::DeployKey,
-            Event::Deployment => EventType::Deployment,
-            Event::DeploymentStatus => EventType::DeploymentStatus,
-            Event::Download => EventType::Download,
-            Event::Follow => EventType::Follow,
-            Event::Fork => EventType::Fork,
-            Event::ForkApply => EventType::ForkApply,
-            Event::GithubAppAuthorization => EventType::GithubAppAuthorization,
-            Event::Gist => EventType::Gist,
-            Event::Gollum => EventType::Gollum,
-            Event::Installation => EventType::Installation,
-            Event::InstallationRepositories => EventType::InstallationRepositories,
+            Event::CommitComment(_) => EventType::CommitComment,
+            Event::ContentReference(_) => EventType::ContentReference,
+            Event::Create(_) => EventType::Create,
+            Event::Delete(_) => EventType::Delete,
+            Event::DeployKey(_) => EventType::DeployKey,
+            Event::Deployment(_) => EventType::Deployment,
+            Event::DeploymentStatus(_) => EventType::DeploymentStatus,
+            Event::Fork(_) => EventType::Fork,
+            Event::GithubAppAuthorization(_) => EventType::GithubAppAuthorization,
+            Event::Gollum(_) => EventType::Gollum,
+            Event::Installation(_) => EventType::Installation,
+            Event::InstallationRepositories(_) => EventType::InstallationRepositories,
             Event::IssueComment(_) => EventType::IssueComment,
             Event::Issues(_) => EventType::Issues,
             Event::Label => EventType::Label,
@@ -315,6 +303,288 @@ impl Event {
             Event::Watch => EventType::Watch,
         }
     }
+}
+
+/// The Action performed by a `CheckRunEvent`
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckRunEventAction {
+    Created,
+    Rerequested,
+    Completed,
+    RequestedAction,
+}
+
+/// `RequestedAction` is included in a `CheckRunEvent` when a user has invoked an action,
+/// i.e. when the `CheckRunEventAction` type is `RequestedAction`.
+#[derive(Clone, Debug, Deserialize)]
+pub struct RequestedAction {
+    pub identifier: String,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#checkrunevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct CheckRunEvent {
+    pub action: CheckRunEventAction,
+    pub check_run: CheckRun,
+    pub requested_action: Option<RequestedAction>,
+
+    // Populated by Webhook events
+    pub repository: Repository,
+    pub sender: User,
+}
+
+/// The Action performed by a `CheckSuiteEvent`
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckSuiteEventAction {
+    Completed,
+    Requested,
+    Rerequested,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#checksuiteevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct CheckSuiteEvent {
+    pub action: CheckSuiteEventAction,
+    pub check_suite: CheckSuite,
+
+    // Populated by Webhook events
+    pub repository: Repository,
+    pub sender: User,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#commitcommentevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct CommitCommentEvent {
+    pub comment: Comment,
+
+    // Populated by Webhook events
+    pub repository: Repository,
+    pub sender: User,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#contentreferenceevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct ContentReferenceEvent {
+    pub action: String,
+    // pub content_reference: ContentReference, //TODO add type
+
+    // Populated by Webhook events
+    pub repository: Repository,
+    pub sender: User,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#createevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct CreateEvent {
+    /// The object that was created. Possible values are: "repository", "branch", "tag"
+    pub ref_type: String,
+    #[serde(rename = "ref")]
+    pub git_ref: String,
+    pub master_branch: String,
+    pub description: Option<String>,
+    pub pusher_type: Option<String>,
+
+    // Populated by Webhook events
+    pub repository: Repository,
+    pub sender: User,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#deleteevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct DeleteEvent {
+    /// The object that was created. Possible values are: "branch", "tag"
+    pub ref_type: String,
+    #[serde(rename = "ref")]
+    pub git_ref: String,
+    pub pusher_type: Option<String>,
+
+    // Populated by Webhook events
+    pub repository: Repository,
+    pub sender: User,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#deploykeyevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct DeployKeyEvent {
+    /// The action performed. Possible values are: "created" or "deleted"
+    pub action: String,
+    pub key: Key,
+
+    // Populated by Webhook events
+    pub repository: Repository,
+    pub sender: User,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#deploymentevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct DeploymentEvent {
+    /// The action performed. Possible values are: "created"
+    pub action: String,
+    //pub deployment: Deployment, //TODO add type
+    pub repository: Repository,
+
+    // Populated by Webhook events
+    pub sender: User,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#deploymentstatusevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct DeploymentStatusEvent {
+    /// The action performed. Possible values are: "created"
+    pub action: String,
+    //pub deployment_status: DeploymentStatus, //TODO add type
+    //pub deployment: Deployment, //TODO add type
+    pub repository: Repository,
+
+    // Populated by Webhook events
+    pub sender: User,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#forkevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct ForkEvent {
+    // The newly created fork
+    pub forkee: Repository,
+
+    // Populated by Webhook events
+    pub repository: Repository,
+    pub sender: User,
+}
+
+/// An event triggered when a user's authorization for a GitHub Application is revoked
+///
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#githubappauthorizationevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct GithubAppAuthorizationEvent {
+    /// The action performed. Possible values are: "revoked"
+    pub action: String,
+
+    // Populated by Webhook events
+    pub sender: User,
+}
+
+// Page represents a single Wiki page.
+#[derive(Clone, Debug, Deserialize)]
+pub struct Page {
+    page_name: String,
+    title: String,
+    summary: Option<String>,
+    action: String,
+    sha: Oid,
+    html_url: String,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#gollumevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct GollumEvent {
+    pub pages: Vec<Page>,
+
+    // Populated by Webhook events
+    pub repository: Repository,
+    pub sender: User,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#installationevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct InstallationEvent {
+    /// The action performed. Possible values are: "created", "deleted", "new_permissions_accepted"
+    pub action: String,
+    //pub installation: Installation, //TODO add type
+    pub sender: User,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#installationrepositoriesevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct InstallationRepositoriesEvent {
+    /// The action performed. Possible values are: "added", "removed"
+    pub action: String,
+    //pub installation: Installation, //TODO add type
+    /// The choice of repositories the installation is on. Can be either "selected" or "all"
+    pub repository_selection: String,
+    pub repositories_added: Vec<Repository>,
+    pub repositories_removed: Vec<Repository>,
+
+    pub sender: User,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct OldContents {
+    pub from: String,
+}
+
+/// The representation of an edit made on an issue, pull request, or comment
+#[derive(Clone, Debug, Deserialize)]
+pub struct EditChange {
+    pub title: Option<OldContents>,
+    pub body: Option<OldContents>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueCommentEventAction {
+    Created,
+    Edited,
+    Deleted,
+}
+
+impl IssueCommentEventAction {
+    pub fn is_created(&self) -> bool {
+        if let IssueCommentEventAction::Created = self {
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#issuecommentevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct IssueCommentEvent {
+    pub action: IssueCommentEventAction,
+    pub changes: Option<EditChange>, // If action is Edited
+    pub issue: Issue,
+    pub comment: Comment,
+
+    // Populated by Webhook events
+    pub repository: Repository,
+    pub sender: User,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueEventAction {
+    Opened,
+    Edited,
+    Deleted,
+    Pinned,
+    Unpinned,
+    Closed,
+    Reopened,
+    Assigned,
+    Unassigned,
+    Labeled,
+    Unlabeled,
+    Locked,
+    Unlocked,
+    Transferred,
+    Milestoned,
+    Demilestoned,
+}
+
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#issuesevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct IssueEvent {
+    pub action: IssueEventAction,
+    pub changes: Option<EditChange>, // If action is Edited
+    pub issue: Issue,
+    pub assignee: Option<User>,
+    pub label: Option<Label>,
+
+    // Populated by Webhook events
+    pub repository: Repository,
+    pub sender: User,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -419,105 +689,6 @@ pub struct PushEvent {
     pub compare: String,
     pub commits: Vec<Commit>,
     pub head_commit: Option<Commit>,
-    pub repository: Repository,
-    pub sender: User,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CheckRunEventAction {
-    Created,
-    Rerequested,
-    Completed,
-    RequestedAction,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct RequestedAction {
-    pub identifier: String,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct CheckRunEvent {
-    pub action: CheckRunEventAction,
-    pub check_run: CheckRun,
-    pub requested_action: Option<RequestedAction>,
-    pub repository: Repository,
-    pub sender: User,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CheckSuiteEventAction {
-    Completed,
-    Requested,
-    Rerequested,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct CheckSuiteEvent {
-    pub action: CheckSuiteEventAction,
-    pub check_suite: CheckSuite,
-    pub repository: Repository,
-    pub sender: User,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum IssueCommentEventAction {
-    Created,
-    Edited,
-    Deleted,
-}
-
-impl IssueCommentEventAction {
-    pub fn is_created(&self) -> bool {
-        if let IssueCommentEventAction::Created = self {
-            true
-        } else {
-            false
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct IssueCommentEvent {
-    pub action: IssueCommentEventAction,
-    // changes: // If action is Edited
-    pub issue: Issue,
-    pub comment: Comment,
-    pub repository: Repository,
-    pub sender: User,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum IssueEventAction {
-    Opened,
-    Edited,
-    Deleted,
-    Pinned,
-    Unpinned,
-    Closed,
-    Reopened,
-    Assigned,
-    Unassigned,
-    Labeled,
-    Unlabeled,
-    Locked,
-    Unlocked,
-    Transferred,
-    Milestoned,
-    Demilestoned,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct IssueEvent {
-    pub action: IssueEventAction,
-    // changes: // If action is Edited
-    pub issue: Issue,
-    pub assignee: Option<User>,
-    pub label: Option<Label>,
     pub repository: Repository,
     pub sender: User,
 }
