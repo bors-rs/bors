@@ -368,13 +368,34 @@ impl Client {
         Ok(Response::new(pagination, rate, ()))
     }
 
-    async fn json<T: serde::de::DeserializeOwned>(
+    async fn json<T: serde::de::DeserializeOwned + std::fmt::Debug>(
         &self,
         response: reqwest::Response,
     ) -> Result<Response<T>> {
         let (response, pagination, rate) = self.check_response(response).await?;
-        let json = response.json().await?;
-        Ok(Response::new(pagination, rate, json))
+        //let json = response.json().await?;
+        //Ok(Response::new(pagination, rate, json))
+
+        // Some old Debugging code
+
+        let payload = response.text().await?;
+        match serde_json::from_str(&payload) {
+            Ok(t) => Ok(Response::new(pagination, rate, t)),
+            Err(_) => {
+                let pretty_json = serde_json::to_string_pretty(&serde_json::from_str::<
+                    serde_json::Value,
+                >(&payload)?)?;
+                let error = format!(
+                    "Error deserializing: {}\nContent: {}",
+                    serde_json::from_str::<T>(&pretty_json)
+                        .unwrap_err()
+                        .to_string(),
+                    pretty_json,
+                );
+                println!("{}", error);
+                Err(error.into())
+            }
+        }
     }
 
     async fn text(&self, response: reqwest::Response) -> Result<Response<String>> {
@@ -479,5 +500,36 @@ impl Client {
 impl Default for Client {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[tokio::test]
+    async fn reactions() {
+        use super::{super::ReactionType, reactions::ListReactionsOptions};
+        //let token = std::env::var("GITHUB_API_TOKEN").unwrap();
+        let client = super::Client::builder()
+            //.github_api_token(token)
+            .build()
+            .unwrap();
+        println!("{:#?}", client.issues().get("libra", "libra", 299).await);
+        println!("{:#?}", client.pulls().get("libra", "libra", 299).await);
+        //let mut ops = ListReactionsOptions::default();
+        //ops.content = Some(ReactionType::MinusOne);
+        // dbg!(
+        //     client
+        //         .reactions()
+        //         .list_for_issue("bmwill", "bors-rs", 6, Some(ops))
+        //         .await
+        // );
+
+        // dbg!(
+        //     client
+        //         .reactions()
+        //         .create_for_issue("bmwill", "bors-rs", 6, ReactionType::ThumbsDown)
+        //         .await
+        // );
+        //dbg!(client.rate_limit().get().await);
     }
 }
