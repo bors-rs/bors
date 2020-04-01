@@ -22,6 +22,7 @@ pub struct Hook {
 pub struct HookConfig {
     content_type: String,
     insecure_ssl: String,
+    secret: Option<String>,
     url: String,
 }
 
