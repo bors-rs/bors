@@ -102,7 +102,6 @@
         "pull_request_review",
         "pull_request_review_comment",
         "push",
-        "registry_package",
         "release",
         "repository",
         "repository_dispatch",
