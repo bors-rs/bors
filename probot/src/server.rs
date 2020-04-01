@@ -1,7 +1,4 @@
-use crate::{
-    probot::{service::Service, smee_client::SmeeClient},
-    Error, Result,
-};
+use crate::{service::Service, smee_client::SmeeClient, Error, Result};
 use futures::{
     future::{self, FutureExt, TryFutureExt},
     try_join,
@@ -82,7 +79,7 @@ impl ServerBuilder {
             let smee_client = SmeeClient::with_uri(smee_uri, server.clone());
             //let smee_handle = tokio::spawn(smee_client.start()).map_err(Error::from);
             let smee_handle = tokio::spawn(smee_client.start()).map(|join_result| {
-                let res = join_result?;
+                let res = join_result.unwrap();
                 res
             });
             try_join!(hyper_server, smee_handle)?;

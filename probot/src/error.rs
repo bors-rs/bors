@@ -7,10 +7,12 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     #[error("Io error")]
     Io(#[from] io::Error),
-    #[error("probot error")]
-    Probot(#[from] probot::Error),
-    #[error("toml parsing error")]
-    Toml(#[from] toml::de::Error),
+    #[error("http error")]
+    Http(#[from] hyper::http::Error),
+    #[error("hyper error")]
+    Hyper(#[from] hyper::Error),
+    #[error("json error")]
+    Json(#[from] serde_json::Error),
     #[error("utf8 error")]
     Utf8(#[from] str::Utf8Error),
     #[error("channel error")]

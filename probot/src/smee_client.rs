@@ -1,4 +1,4 @@
-use crate::{probot::Server, Result};
+use crate::{Result, Server};
 use bytes::{Buf, Bytes, BytesMut};
 use github::{EventType, RawWebhook};
 use hyper::{body::HttpBody, Body, Client, Request};

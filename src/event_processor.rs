@@ -1,4 +1,4 @@
-use crate::{command::Command, probot, Config};
+use crate::{command::Command, Config};
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
 use github::{Event, Webhook};
 use hotpot_db::HotPot;

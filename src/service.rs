@@ -1,4 +1,4 @@
-use crate::{event_processor::EventProcessor, probot, Config, Result};
+use crate::{event_processor::EventProcessor, Config, Result};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]

@@ -3,7 +3,6 @@ mod config;
 mod error;
 mod event_processor;
 mod graphql;
-mod probot;
 mod service;
 
 pub use config::Config;
