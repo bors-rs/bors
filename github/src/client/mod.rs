@@ -3,6 +3,7 @@
 use reqwest::{header, Client as ReqwestClient, Method, RequestBuilder};
 
 mod error;
+mod graphql;
 mod issues;
 mod license;
 mod markdown;
@@ -11,7 +12,8 @@ mod pulls;
 mod rate_limit;
 mod reactions;
 
-pub use error::{Error, Result};
+pub use error::{Error, GraphqlError, Result};
+pub use graphql::GraphqlClient;
 pub use issues::IssuesClient;
 pub use license::LicenseClient;
 pub use markdown::MarkdownClient;
@@ -343,6 +345,10 @@ impl Client {
         let (response, pagination, rate) = self.check_response(response).await?;
         let text = response.text().await?;
         Ok(Response::new(pagination, rate, text))
+    }
+
+    pub fn graphql(&self) -> GraphqlClient {
+        GraphqlClient::new(&self)
     }
 
     // TODO: actions endpoint
