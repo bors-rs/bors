@@ -5,6 +5,7 @@ use std::{fs, path::Path};
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub secret: Option<String>,
+    pub github_api_token: String,
 }
 
 impl Config {

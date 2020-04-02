@@ -39,6 +39,7 @@ impl probot::Service for EventProcessorSender {
 #[derive(Debug)]
 pub struct EventProcessor {
     config: Config,
+    github: Client,
     db: Mutex<HotPot>,
     requests_rx: mpsc::Receiver<Request>,
 }
@@ -46,10 +47,16 @@ pub struct EventProcessor {
 impl EventProcessor {
     pub fn new(config: Config) -> (EventProcessorSender, Self) {
         let (tx, rx) = mpsc::channel(1024);
+        let github = Client::builder()
+            .github_api_token(config.github_api_token.clone())
+            .build()
+            .unwrap();
+
         (
             EventProcessorSender::new(tx),
             Self {
                 config,
+                github,
                 db: Mutex::new(HotPot::new()),
                 requests_rx: rx,
             },
