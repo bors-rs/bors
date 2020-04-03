@@ -25,6 +25,9 @@ pub enum Error {
 
     #[error("RateLimit")]
     RateLimit,
+
+    #[error("AbuseLimit")]
+    AbuseLimit,
 }
 
 impl From<&'static str> for Error {
