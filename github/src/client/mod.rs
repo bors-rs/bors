@@ -175,6 +175,10 @@ impl<T> Response<T> {
         &self.rate
     }
 
+    pub fn inner(&self) -> &T {
+        &self.inner
+    }
+
     pub fn into_inner(self) -> T {
         self.inner
     }
