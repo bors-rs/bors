@@ -9,8 +9,8 @@ edition = "2018"
 async-trait = "0.1.24"
 env_logger = "0.7.1"
 futures = "0.3"
-github = { path = "github" }
-# graphql_client = "0.9.0"
+github = { path = "github", features = ["graphql"] }
+graphql_client = "0.9.0"
 hotpot-db = "0.0.2"
 log = "0.4.8"
 probot = { path = "probot" }

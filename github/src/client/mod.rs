@@ -3,6 +3,7 @@
 use reqwest::{header, Client as ReqwestClient, Method, RequestBuilder};
 
 mod error;
+#[cfg(feature = "graphql")]
 mod graphql;
 mod issues;
 mod license;
@@ -12,7 +13,8 @@ mod pulls;
 mod rate_limit;
 mod reactions;
 
-pub use error::{Error, GraphqlError, Result};
+pub use error::{Error, Result};
+#[cfg(feature = "graphql")]
 pub use graphql::GraphqlClient;
 pub use issues::IssuesClient;
 pub use license::LicenseClient;
@@ -347,6 +349,7 @@ impl Client {
         Ok(Response::new(pagination, rate, text))
     }
 
+    #[cfg(feature = "graphql")]
     pub fn graphql(&self) -> GraphqlClient {
         GraphqlClient::new(&self)
     }

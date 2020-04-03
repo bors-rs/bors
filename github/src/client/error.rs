@@ -29,8 +29,9 @@ pub enum Error {
     #[error("AbuseLimit")]
     AbuseLimit,
 
+    #[cfg(feature = "graphql")]
     #[error("GraphqlError: {}", 0)]
-    GraphqlError(Vec<GraphqlError>),
+    GraphqlError(Vec<graphql_client::Error>),
 }
 
 impl From<&'static str> for Error {
@@ -63,16 +64,4 @@ pub enum GithubClientErrorType {
         field: String,
         code: String,
     },
-}
-
-#[derive(Debug, Deserialize)]
-pub struct GraphqlErrorLocation {
-    pub line: usize,
-    pub column: usize,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct GraphqlError {
-    pub message: String,
-    pub locations: Option<Vec<GraphqlErrorLocation>>,
 }
