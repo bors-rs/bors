@@ -92,7 +92,7 @@ pub struct ReviewComment {
     pub pull_request_review_id: u64,
     pub diff_hunk: String,
     pub path: String,
-    pub position: u64,
+    pub position: Option<u64>,
     pub original_position: u64,
     pub commit_id: Oid,
     pub original_commit_id: Oid,

@@ -69,7 +69,7 @@ pub struct RateLimits {
     integration_manifest: Rate,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct RateLimitResponse {
     resources: RateLimits,
 }
