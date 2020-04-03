@@ -1,4 +1,4 @@
-use crate::{command::Command, Config};
+use crate::{command::Command, graphql::GithubClient, Config};
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
 use github::{Event, Webhook};
 use hotpot_db::HotPot;
@@ -39,7 +39,7 @@ impl probot::Service for EventProcessorSender {
 #[derive(Debug)]
 pub struct EventProcessor {
     config: Config,
-    github: Client,
+    github: GithubClient,
     db: Mutex<HotPot>,
     requests_rx: mpsc::Receiver<Request>,
 }
@@ -47,10 +47,7 @@ pub struct EventProcessor {
 impl EventProcessor {
     pub fn new(config: Config) -> (EventProcessorSender, Self) {
         let (tx, rx) = mpsc::channel(1024);
-        let github = Client::builder()
-            .github_api_token(config.github_api_token.clone())
-            .build()
-            .unwrap();
+        let github = GithubClient::new(&config.github_api_token);
 
         (
             EventProcessorSender::new(tx),
