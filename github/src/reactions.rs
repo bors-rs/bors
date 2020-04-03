@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 // GitHub API docs: https://developer.github.com/v3/reactions/
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReactionType {
     #[serde(rename = "+1")]
