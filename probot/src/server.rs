@@ -3,7 +3,7 @@ use futures::{
     future::{self, FutureExt, TryFutureExt},
     try_join,
 };
-use github::{EventType, RawWebhook};
+use github::{EventType, Webhook, DELIVERY_ID_HEADER, EVENT_TYPE_HEADER, SIGNATURE_HEADER};
 use hyper::{
     body,
     header::{HeaderValue, CONTENT_LENGTH, CONTENT_TYPE},
@@ -160,27 +160,27 @@ impl Server {
     }
 
     //TODO maybe insert into database here
-    pub(super) async fn handle_webhook(&mut self, raw_webhook: RawWebhook) -> Result<()> {
-        info!("Handling Webhook: {}", raw_webhook.guid);
+    pub(super) async fn handle_webhook(&mut self, webhook: Webhook) -> Result<()> {
+        info!("Handling Webhook: {}", webhook.delivery_id);
 
-        if raw_webhook.check_signature(self.secret.as_deref().map(str::as_bytes)) {
+        if webhook.check_signature(self.secret.as_deref().map(str::as_bytes)) {
             info!("Signature check PASSED!");
         } else {
             warn!("Signature check FAILED! Skipping Event.");
             return Ok(());
         }
 
-        let webhook = raw_webhook.to_webhook()?;
+        let event = webhook.to_event()?;
         for service in self.services.iter() {
-            if service.route(webhook.event.event_type()) {
-                service.handle(&webhook.event, &webhook.guid).await;
+            if service.route(webhook.event_type) {
+                service.handle(&event, &webhook.delivery_id).await;
             }
         }
         Ok(())
     }
 }
 
-async fn webhook_from_request(request: Request<Body>) -> Result<RawWebhook> {
+async fn webhook_from_request(request: Request<Body>) -> Result<Webhook> {
     // Webhooks from github should only contain json payloads
     match request.headers().get(CONTENT_TYPE).map(HeaderValue::to_str) {
         Some(Ok("application/json")) => {}
@@ -189,27 +189,18 @@ async fn webhook_from_request(request: Request<Body>) -> Result<RawWebhook> {
 
     let event_type = match request
         .headers()
-        .get("X-GitHub-Event")
-        .map(HeaderValue::to_str)
-        .transpose()
-        .ok()
-        .and_then(std::convert::identity)
-        .map(str::parse::<EventType>)
-        .transpose()
-        .ok()
-        .and_then(std::convert::identity)
+        .get(EVENT_TYPE_HEADER)
+        .and_then(|h| HeaderValue::to_str(h).ok())
+        .and_then(|s| s.parse::<EventType>().ok())
     {
         Some(event) => event,
         _ => return Err("missing valid X-GitHub-Event header".into()),
     };
 
-    let guid = match request
+    let delivery_id = match request
         .headers()
-        .get("X-GitHub-Delivery")
-        .map(HeaderValue::to_str)
-        .transpose()
-        .ok()
-        .and_then(std::convert::identity)
+        .get(DELIVERY_ID_HEADER)
+        .and_then(|h| HeaderValue::to_str(h).ok())
     {
         Some(guid) => guid.to_owned(),
         _ => return Err("missing valid X-GitHub-Delivery header".into()),
@@ -217,21 +208,18 @@ async fn webhook_from_request(request: Request<Body>) -> Result<RawWebhook> {
 
     let signature = match request
         .headers()
-        .get("X-Hub-Signature")
-        .map(HeaderValue::to_str)
-        .transpose()
-        .ok()
-        .and_then(std::convert::identity)
+        .get(SIGNATURE_HEADER)
+        .and_then(|h| HeaderValue::to_str(h).ok())
     {
         Some(signature) => Some(signature.to_owned()),
         _ => None,
     };
 
-    let body = body::to_bytes(request.into_body()).await?;
+    let body = body::to_bytes(request.into_body()).await?.to_vec();
 
-    Ok(RawWebhook {
+    Ok(Webhook {
         event_type,
-        guid,
+        delivery_id,
         signature,
         body,
     })

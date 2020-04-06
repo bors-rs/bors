@@ -1,25 +1,30 @@
-//TODO Now that these types are in their own crate the types for Webhook and RawWebhook need to be
-// refined.
-
 use super::{Event, EventType};
-use bytes::Bytes;
 use log::{debug, warn};
+
+/// The GitHub header key used to pass the event type
+///
+/// Github API docs: https://developer.github.com/webhooks/#delivery-headers
+pub const EVENT_TYPE_HEADER: &str = "X-Github-Event";
+
+/// The GitHub header key used to pass the unique ID for the webhook event
+///
+/// Github API docs: https://developer.github.com/webhooks/#delivery-headers
+pub const DELIVERY_ID_HEADER: &str = "X-Github-Delivery";
+
+/// The GitHub header key used to pass the HMAC hexdigest
+///
+/// Github API docs: https://developer.github.com/webhooks/#delivery-headers
+pub const SIGNATURE_HEADER: &str = "X-Hub-Signature";
 
 #[derive(Clone, Debug)]
 pub struct Webhook {
-    pub event: Event,
-    pub guid: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct RawWebhook {
     pub event_type: EventType,
-    pub guid: String,
+    pub delivery_id: String,
     pub signature: Option<String>,
-    pub body: Bytes,
+    pub body: Vec<u8>,
 }
 
-impl RawWebhook {
+impl Webhook {
     pub fn check_signature(&self, key: Option<&[u8]>) -> bool {
         match (key, &self.signature) {
             (Some(key), Some(signature)) if signature.starts_with("sha1=") => {
@@ -41,11 +46,7 @@ impl RawWebhook {
         }
     }
 
-    pub fn to_webhook(&self) -> Result<Webhook, serde_json::Error> {
-        let event = Event::from_json(&self.event_type, &self.body)?;
-        Ok(Webhook {
-            event,
-            guid: self.guid.clone(),
-        })
+    pub fn to_event(&self) -> Result<Event, serde_json::Error> {
+        Event::from_json(&self.event_type, &self.body)
     }
 }

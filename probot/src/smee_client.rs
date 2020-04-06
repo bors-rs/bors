@@ -1,6 +1,6 @@
 use crate::{Result, Server};
-use bytes::{Buf, Bytes, BytesMut};
-use github::{EventType, RawWebhook};
+use bytes::{Buf, BytesMut};
+use github::{EventType, Webhook};
 use hyper::{body::HttpBody, Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use log::{debug, info};
@@ -59,7 +59,7 @@ impl SmeeClient {
 enum SmeeEvent {
     Ready,
     Ping,
-    Message(RawWebhook),
+    Message(Webhook),
 }
 
 #[derive(Debug, Deserialize)]
@@ -69,7 +69,7 @@ struct SmeeMessage<'a> {
     #[serde(borrow, rename = "body")]
     event: &'a RawValue,
     #[serde(rename = "x-github-delivery")]
-    guid: String,
+    delivery_id: String,
     #[serde(rename = "x-hub-signature")]
     signature: Option<String>,
 }
@@ -127,12 +127,11 @@ impl<'b> SmeeEventParser<'b> {
             (Some("ping"), Some(_)) => SmeeEvent::Ping,
             (None, Some(data)) => {
                 let smee_msg: SmeeMessage = serde_json::from_str(&data)?;
-                let body = Bytes::copy_from_slice(smee_msg.event.get().as_bytes());
-                let webhook = RawWebhook {
+                let webhook = Webhook {
                     event_type: smee_msg.event_type,
-                    guid: smee_msg.guid,
+                    delivery_id: smee_msg.delivery_id,
                     signature: smee_msg.signature,
-                    body,
+                    body: smee_msg.event.get().as_bytes().to_owned(),
                 };
                 SmeeEvent::Message(webhook)
             }
