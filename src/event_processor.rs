@@ -1,13 +1,13 @@
 use crate::{command::Command, graphql::GithubClient, Config};
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
-use github::{Event, Webhook};
+use github::{Event, EventType};
 use hotpot_db::HotPot;
 use log::info;
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum Request {
-    Webhook(Webhook),
+    Webhook { event: Event, delivery_id: String },
 }
 
 #[derive(Clone, Debug)]
@@ -20,19 +20,32 @@ impl EventProcessorSender {
         Self { inner }
     }
 
-    pub async fn webhook(&mut self, webhook: Webhook) -> Result<(), mpsc::SendError> {
-        self.inner.send(Request::Webhook(webhook)).await
+    pub async fn webhook(
+        &mut self,
+        event: Event,
+        delivery_id: String,
+    ) -> Result<(), mpsc::SendError> {
+        self.inner
+            .send(Request::Webhook { event, delivery_id })
+            .await
     }
 }
 
 #[async_trait::async_trait]
 impl probot::Service for EventProcessorSender {
-    fn route(&self, _webhook: &Webhook) -> bool {
+    fn name(&self) -> &'static str {
+        "bors"
+    }
+
+    fn route(&self, _event_type: EventType) -> bool {
         true
     }
 
-    async fn handle(&self, webhook: &Webhook) {
-        self.clone().webhook(webhook.clone()).await.unwrap();
+    async fn handle(&self, event: &Event, delivery_id: &str) {
+        self.clone()
+            .webhook(event.clone(), delivery_id.to_owned())
+            .await
+            .unwrap();
     }
 }
 
@@ -69,15 +82,15 @@ impl EventProcessor {
     async fn handle_request(&self, request: Request) {
         use Request::*;
         match request {
-            Webhook(webhook) => self.handle_webhook(webhook).await,
+            Webhook { event, delivery_id } => self.handle_webhook(event, delivery_id).await,
         }
     }
 
-    async fn handle_webhook(&self, webhook: Webhook) {
-        info!("Handling Webhook: {}", webhook.guid);
+    async fn handle_webhook(&self, event: Event, delivery_id: String) {
+        info!("Handling Webhook: {}", delivery_id);
 
         //TODO route on the request
-        match &webhook.event {
+        match &event {
             Event::PullRequest(_e) => {}
             Event::IssueComment(e) => {
                 // Only process commands from newly created comments

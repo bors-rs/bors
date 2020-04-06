@@ -172,8 +172,8 @@ impl Server {
 
         let webhook = raw_webhook.to_webhook()?;
         for service in self.services.iter() {
-            if service.route(&webhook) {
-                service.handle(&webhook).await;
+            if service.route(webhook.event.event_type()) {
+                service.handle(&webhook.event, &webhook.guid).await;
             }
         }
         Ok(())

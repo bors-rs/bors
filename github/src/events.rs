@@ -6,7 +6,7 @@ use serde::{de, Deserialize};
 use std::str::FromStr;
 use thiserror::Error;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum EventType {
     CheckRun,
     CheckSuite,
