@@ -23,7 +23,7 @@ pub use markdown::MarkdownClient;
 pub use pagination::{
     Pagination, PaginationCursorOptions, PaginationOptions, SortDirection, SortPages, StateFilter,
 };
-pub use pulls::PullsClient;
+pub use pulls::{ListPullsOptions, PullsClient};
 pub use rate_limit::{Rate, RateLimitClient, RateLimits};
 pub use reactions::ReactionsClient;
 

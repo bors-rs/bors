@@ -3,7 +3,7 @@
 //! https://developer.github.com/v3/
 
 mod check;
-mod client; //TODO Maybe hide with a feature?
+pub mod client; //TODO Maybe hide with a feature?
 mod common;
 mod events;
 mod hook;
