@@ -1,8 +1,9 @@
-use crate::{command::Command, graphql::GithubClient, Config};
+use crate::{command::Command, graphql::GithubClient, state::PullRequestState, Config};
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
 use github::{Event, EventType, NodeId};
 use hotpot_db::HotPot;
 use log::info;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -53,6 +54,7 @@ impl probot::Service for EventProcessorSender {
 pub struct EventProcessor {
     config: Config,
     github: GithubClient,
+    pulls: HashMap<u64, PullRequestState>,
     db: Mutex<HotPot>,
     requests_rx: mpsc::Receiver<Request>,
 }
@@ -67,6 +69,7 @@ impl EventProcessor {
             Self {
                 config,
                 github,
+                pulls: HashMap::new(),
                 db: Mutex::new(HotPot::new()),
                 requests_rx: rx,
             },
@@ -74,6 +77,8 @@ impl EventProcessor {
     }
 
     pub async fn start(mut self) {
+        self.synchronize().await;
+
         while let Some(request) = self.requests_rx.next().await {
             self.handle_request(request).await
         }
@@ -135,5 +140,21 @@ impl EventProcessor {
                 info!("No command in comment");
             }
         }
+    }
+
+    async fn synchronize(&mut self) {
+        info!("Synchronizing");
+
+        // TODO: Handle error
+        let pulls = self.github.open_pulls("libra", "libra").await.unwrap();
+        info!("{} Open PullRequests", pulls.len());
+
+        // TODO: Scrape the comments/Reviews of each PR to pull out reviewer/approval data
+
+        self.pulls.clear();
+        self.pulls
+            .extend(pulls.into_iter().map(|pr| (pr.number, pr)));
+
+        info!("Done Synchronizing");
     }
 }

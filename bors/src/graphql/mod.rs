@@ -6,7 +6,7 @@
 //! [Github's v4 API Explorer](https://developer.github.com/v4/explorer/)
 //! [Github's v4 API Docs](https://developer.github.com/v4/)
 
-use crate::Result;
+use crate::{state::PullRequestState, Result};
 use github::{client::Response, Client, NodeId, ReactionType};
 use graphql_client::GraphQLQuery;
 use std::ops::Deref;
@@ -42,6 +42,45 @@ impl GithubClient {
         let _: Response<ResponseData> = self.0.graphql().query(&q).await?;
 
         Ok(())
+    }
+
+    pub async fn open_pulls(&self, owner: &str, name: &str) -> Result<Vec<PullRequestState>> {
+        use query::{
+            list_pulls::{ResponseData, Variables},
+            ListPulls,
+        };
+
+        let mut ret = Vec::new();
+        let mut has_next_page = true;
+        let mut cursor = None;
+
+        while has_next_page {
+            let q = ListPulls::build_query(Variables {
+                owner: owner.to_owned(),
+                name: name.to_owned(),
+                cursor: cursor.clone(),
+            });
+
+            let response: ResponseData = self.0.graphql().query(&q).await?.into_inner();
+
+            let pull_requests = if let Some(repo) = response.repository {
+                repo.pull_requests
+            } else {
+                // Maybe error?
+                break;
+            };
+
+            has_next_page = pull_requests.page_info.has_next_page;
+            cursor = pull_requests.page_info.end_cursor;
+
+            let pr_iter = pull_requests
+                .nodes
+                .into_iter()
+                .flat_map(|nodes| nodes.into_iter().flat_map(|pr| pr.map(Into::into)));
+            ret.extend(pr_iter);
+        }
+
+        Ok(ret)
     }
 }
 

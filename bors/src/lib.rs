@@ -4,6 +4,7 @@ mod error;
 mod event_processor;
 mod graphql;
 mod service;
+mod state;
 
 pub use config::Config;
 pub use error::{Error, Result};

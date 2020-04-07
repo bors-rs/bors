@@ -1,0 +1,36 @@
+query ListPulls($owner: String!, $name: String!, $cursor: String) {
+  repository(name: $name, owner: $owner) {
+      pullRequests(states: OPEN, first: 25, after: $cursor) {
+        nodes {
+          number
+          author {
+            login
+            __typename
+          }
+          title
+          body
+          state
+          isDraft
+          maintainerCanModify
+          mergeable
+          labels(first: 20) {
+            nodes {
+              name
+            }
+          }
+          headRefName
+          headRefOid
+          headRepository {
+            nameWithOwner
+          }
+          baseRefName
+          baseRefOid
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        totalCount
+      }
+  }
+}
