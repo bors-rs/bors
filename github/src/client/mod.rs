@@ -18,6 +18,7 @@ pub use error::{Error, Result};
 pub use graphql::GraphqlClient;
 pub use issues::IssuesClient;
 pub use license::LicenseClient;
+use log::debug;
 pub use markdown::MarkdownClient;
 pub use pagination::{
     Pagination, PaginationCursorOptions, PaginationOptions, SortDirection, SortPages, StateFilter,
@@ -326,6 +327,7 @@ impl Client {
         let pagination = Pagination::from_headers(response.headers());
         let rate = Rate::from_headers(response.headers());
 
+        debug!("RateLimit info: {:?}", rate);
         Ok((response, pagination, rate))
     }
 
