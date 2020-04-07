@@ -10,7 +10,7 @@ pub struct CommitRef {
     pub git_ref: String,
     pub sha: Oid,
     pub user: User,
-    pub repo: Repository,
+    pub repo: Option<Repository>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
