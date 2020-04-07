@@ -12,21 +12,21 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Serialize)]
 pub struct ListPullsOptions {
     /// Indicates the state of the pull requests to return. Default: open
-    pub state: StateFilter,
+    pub state: Option<StateFilter>,
 
     /// Filter pulls by head user or head organization and branch name in the format of
     /// user:ref-name or organization:ref-name. For example: github:new-script-format or
     /// octocat:test-branch.
-    pub head: String,
+    pub head: Option<String>,
 
     /// Filter pulls by base branch name. Example: gh-pages.
-    pub base: String,
+    pub base: Option<String>,
 
     /// What to sort results by. Default: created
-    pub sort: SortPages,
+    pub sort: Option<SortPages>,
 
     /// The direction of the sort. Default: desc
-    pub direction: SortDirection,
+    pub direction: Option<SortDirection>,
 
     #[serde(flatten)]
     pub pagination_options: PaginationOptions,
