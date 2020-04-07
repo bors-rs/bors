@@ -9,6 +9,8 @@ pub enum Error {
     Io(#[from] io::Error),
     #[error("probot error")]
     Probot(#[from] probot::Error),
+    #[error("github client error")]
+    GithubClient(#[from] github::client::Error),
     #[error("toml parsing error")]
     Toml(#[from] toml::de::Error),
     #[error("utf8 error")]
