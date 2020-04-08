@@ -14,6 +14,14 @@ pub struct CommitRef {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PullRequestState {
+    Open,
+    Closed,
+    Merged,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct PullRequest {
     pub url: String,
     pub id: u64,
