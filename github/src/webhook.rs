@@ -47,6 +47,6 @@ impl Webhook {
     }
 
     pub fn to_event(&self) -> Result<Event, serde_json::Error> {
-        Event::from_json(&self.event_type, &self.body)
+        Event::from_json(self.event_type, &self.body)
     }
 }

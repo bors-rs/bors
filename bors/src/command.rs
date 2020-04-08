@@ -10,7 +10,7 @@ pub struct Command {
 impl Command {
     pub fn from_comment(c: &str) -> Option<Result<Self, ParseCommnadError>> {
         c.lines()
-            .find(|line| line.starts_with("/"))
+            .find(|line| line.starts_with('/'))
             .map(FromStr::from_str)
     }
 }

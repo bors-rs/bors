@@ -189,8 +189,7 @@ pub enum Event {
 }
 
 impl Event {
-    // Maybe rename this or use TryFrom<(EventType, &[u8])>?
-    pub fn from_json(event_type: &EventType, json: &[u8]) -> Result<Self, serde_json::Error> {
+    pub fn from_json(event_type: EventType, json: &[u8]) -> Result<Self, serde_json::Error> {
         let event = match event_type {
             EventType::CheckRun => Event::CheckRun(serde_json::from_slice(json)?),
             EventType::CheckSuite => Event::CheckSuite(serde_json::from_slice(json)?),
