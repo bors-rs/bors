@@ -12,6 +12,7 @@ mod pagination;
 mod pulls;
 mod rate_limit;
 mod reactions;
+mod repos;
 
 pub use error::{Error, Result};
 #[cfg(feature = "graphql")]
@@ -26,6 +27,7 @@ pub use pagination::{
 pub use pulls::{ListPullsOptions, PullsClient};
 pub use rate_limit::{Rate, RateLimitClient, RateLimits};
 pub use reactions::ReactionsClient;
+pub use repos::RepositoryClient;
 
 // Constants
 const DEFAULT_BASE_URL: &str = "https://api.github.com/";
@@ -443,8 +445,11 @@ impl Client {
         ReactionsClient::new(&self)
     }
 
-    // TODO repos endpoint
-    // https://developer.github.com/v3/repos/
+    /// repos endpoint
+    /// https://developer.github.com/v3/repos/
+    pub fn repos(&self) -> RepositoryClient {
+        RepositoryClient::new(&self)
+    }
 
     // TODO search endpoint
     // https://developer.github.com/v3/search/
