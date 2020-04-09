@@ -331,6 +331,27 @@ impl Client {
         Ok((response, pagination, rate))
     }
 
+    // TODO instead of duplicating code, try to share code with `check_response`
+    async fn boolean(&self, response: reqwest::Response) -> Result<Response<bool>> {
+        let ret = if response.status().is_success() {
+            true
+        } else if response.status().as_u16() == 404 {
+            false
+        } else {
+            let status = response.status();
+            // BUG: Don't try to look for a payload for all response types
+            // https://developer.github.com/v3/#client-errors
+            let msg = response.json().await?;
+            return Err(Error::GithubClientError(status, msg));
+        };
+
+        let pagination = Pagination::from_headers(response.headers());
+        let rate = Rate::from_headers(response.headers());
+
+        debug!("RateLimit info: {:?}", rate);
+        Ok(Response::new(pagination, rate, ret))
+    }
+
     async fn empty(&self, response: reqwest::Response) -> Result<Response<()>> {
         let (_response, pagination, rate) = self.check_response(response).await?;
         Ok(Response::new(pagination, rate, ()))

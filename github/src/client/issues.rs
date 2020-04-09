@@ -351,14 +351,13 @@ impl<'a> IssuesClient<'a> {
         owner: &str,
         repo: &str,
         assignee: &str,
-    ) -> Result<Response<()>> {
+    ) -> Result<Response<bool>> {
         let url = format!("repos/{}/{}/assignees/{}", owner, repo, assignee);
         let response = self.inner.get(&url).send().await?;
 
-        //TODO actually return a bool instead based off the the response code:
         // 204: the assignee can be assigned to the issue
         // 404: the assignee cannot be assigned to the issue
-        self.inner.empty(response).await
+        self.inner.boolean(response).await
     }
 
     /// Add up to 10 assignees to an issue. Users already assigned to an issue are not replaced.

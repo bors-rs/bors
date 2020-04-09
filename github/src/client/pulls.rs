@@ -394,7 +394,6 @@ impl<'a> PullsClient<'a> {
         self.inner.empty(response).await
     }
 
-    //TODO parse into a bool
     /// Check if a pull request has been merged
     ///
     /// GitHub API docs: https://developer.github.com/v3/pulls/#get-if-a-pull-request-has-been-merged
@@ -403,11 +402,11 @@ impl<'a> PullsClient<'a> {
         owner: &str,
         repo: &str,
         pull_number: u64,
-    ) -> Result<Response<()>> {
+    ) -> Result<Response<bool>> {
         let url = format!("repos/{}/{}/pulls/{}/merge", owner, repo, pull_number);
         let response = self.inner.get(&url).send().await?;
 
-        self.inner.empty(response).await
+        self.inner.boolean(response).await
     }
 
     /// Merge a pull request (hit the Merge Button)
