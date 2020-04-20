@@ -221,4 +221,29 @@ impl Command {
 
         Ok(command_type)
     }
+
+    /// Display help information for Commands, formatted for use in Github comments
+    pub fn help() -> impl std::fmt::Display {
+        Help
+    }
+}
+
+struct Help;
+
+impl std::fmt::Display for Help {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "<details>")?;
+        write!(f, "<summary>")?;
+        write!(f, "Bors commands and options")?;
+        writeln!(f, "</summary>")?;
+        writeln!(f, "<br />")?;
+        writeln!(f)?;
+
+        writeln!(f, "You can trigger Bors actions by commenting:")?;
+        writeln!(f, "- `/lgtm` will approve a PR")?;
+        writeln!(f, "- `/land` will attempt to land or merge a PR")?;
+
+        writeln!(f)?;
+        writeln!(f, "</details>")
+    }
 }
