@@ -211,7 +211,7 @@ impl Command {
         let command_type = match command_name {
             "approve" | "lgtm" | "r+" => CommandType::Approve(Approve::with_args(args)?),
             "unapprove" | "r-" => CommandType::Unapprove,
-            "land" => CommandType::Land(Land::with_args(args)?),
+            "land" | "merge" => CommandType::Land(Land::with_args(args)?),
             "retry" => CommandType::Retry(Retry::with_args(args)?),
             "cancel" | "stop" => CommandType::Cancel,
             "priority" => CommandType::Priority(Priority::with_args(args)?),
@@ -239,9 +239,31 @@ impl std::fmt::Display for Help {
         writeln!(f, "<br />")?;
         writeln!(f)?;
 
-        writeln!(f, "You can trigger Bors actions by commenting:")?;
-        writeln!(f, "- `/lgtm` will approve a PR")?;
-        writeln!(f, "- `/land` will attempt to land or merge a PR")?;
+        writeln!(
+            f,
+            "Bors actions can be triggered by posting a comment of the form `/<action>`:"
+        )?;
+        writeln!(
+            f,
+            "- __Approve__ `approve`, `lgtm`, `r+`: add your approval to a PR"
+        )?;
+        writeln!(
+            f,
+            "- __Unapprove__ `unapprove`, `r-`: remove your approval to a PR"
+        )?;
+        writeln!(
+            f,
+            "- __Land__ `land`, `merge`: attempt to land or merge a PR"
+        )?;
+        writeln!(
+            f,
+            "- __Retry__ `retry`: attempt to retry the last action (usually a land/merge)"
+        )?;
+        writeln!(f, "- __Cancel__ `cancel`, `stop`: stop an in-progress land")?;
+        writeln!(
+            f,
+            "- __Priority__ `priority`: set the priority level for a PR"
+        )?;
 
         writeln!(f)?;
         writeln!(f, "</details>")
