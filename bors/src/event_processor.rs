@@ -146,7 +146,11 @@ impl EventProcessor {
         info!("Synchronizing");
 
         // TODO: Handle error
-        let pulls = self.github.open_pulls("libra", "libra").await.unwrap();
+        let pulls = self
+            .github
+            .open_pulls(self.config.repo().owner(), self.config.repo().name())
+            .await
+            .unwrap();
         info!("{} Open PullRequests", pulls.len());
 
         // TODO: Scrape the comments/Reviews of each PR to pull out reviewer/approval data

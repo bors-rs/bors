@@ -1,4 +1,5 @@
 use github::Oid;
+use serde::Deserialize;
 
 #[derive(Debug)]
 pub struct PullRequestState {
@@ -29,7 +30,7 @@ pub struct PullRequestState {
     pub merge_oid: Option<Oid>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct Repo {
     owner: String,
     name: String,
@@ -43,12 +44,10 @@ impl Repo {
         }
     }
 
-    #[allow(dead_code)]
     pub fn owner(&self) -> &str {
         &self.owner
     }
 
-    #[allow(dead_code)]
     pub fn name(&self) -> &str {
         &self.name
     }

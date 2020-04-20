@@ -1,9 +1,10 @@
-use crate::Result;
+use crate::{state::Repo, Result};
 use serde::Deserialize;
 use std::{fs, path::Path};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    pub repo: Repo,
     pub secret: Option<String>,
     pub github_api_token: String,
 }
@@ -16,5 +17,9 @@ impl Config {
 
     pub fn secret(&self) -> Option<&[u8]> {
         self.secret.as_ref().map(String::as_bytes)
+    }
+
+    pub fn repo(&self) -> &Repo {
+        &self.repo
     }
 }
