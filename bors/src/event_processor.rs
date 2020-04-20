@@ -100,20 +100,24 @@ impl EventProcessor {
             Event::IssueComment(e) => {
                 // Only process commands from newly created comments
                 if e.action.is_created() && e.issue.is_pull_request() {
-                    self.process_comment(e.comment.body(), &e.comment.node_id)
+                    self.process_comment(e.issue.number, e.comment.body(), &e.comment.node_id)
                         .await
                 }
             }
             Event::PullRequestReview(e) => {
                 if e.action.is_submitted() {
-                    self.process_comment(e.review.body(), &e.review.node_id)
+                    self.process_comment(e.pull_request.number, e.review.body(), &e.review.node_id)
                         .await
                 }
             }
             Event::PullRequestReviewComment(e) => {
                 if e.action.is_created() {
-                    self.process_comment(e.comment.body(), &e.comment.node_id)
-                        .await
+                    self.process_comment(
+                        e.pull_request.number,
+                        e.comment.body(),
+                        &e.comment.node_id,
+                    )
+                    .await
                 }
             }
             // Unsupported Event
@@ -121,7 +125,7 @@ impl EventProcessor {
         }
     }
 
-    async fn process_comment(&self, comment: Option<&str>, node_id: &NodeId) {
+    async fn process_comment(&self, issue_number: u64, comment: Option<&str>, node_id: &NodeId) {
         info!("comment: {:#?}", comment);
         match comment.and_then(Command::from_comment) {
             Some(Ok(_)) => {
@@ -135,6 +139,17 @@ impl EventProcessor {
             }
             Some(Err(_)) => {
                 info!("Invalid Command");
+                self.github
+                    .issues()
+                    .create_comment(
+                        self.config.repo().owner(),
+                        self.config.repo().name(),
+                        issue_number,
+                        &format!("{}", Command::help()),
+                    )
+                    .await
+                    // TODO handle or ignore error
+                    .unwrap();
             }
             None => {
                 info!("No command in comment");
