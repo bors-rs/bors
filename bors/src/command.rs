@@ -141,6 +141,39 @@ impl Command {
             .map(Self::from_line)
     }
 
+    #[allow(dead_code)]
+    pub fn from_comment_with_username(
+        c: &str,
+        my_username: &str,
+    ) -> Option<Result<Self, ParseCommnadError>> {
+        c.lines()
+            .find(|line| Self::line_starts_with_username(line, my_username))
+            .map(|line| Self::from_line_with_username(line, my_username))
+    }
+
+    fn from_line_with_username(s: &str, my_username: &str) -> Result<Self, ParseCommnadError> {
+        if !Self::line_starts_with_username(s, my_username) {
+            return Err(ParseCommnadError);
+        }
+
+        let command_type = Self::from_iter(s.split_whitespace().skip(1))?;
+
+        Ok(Command {
+            cmd: s.to_owned(),
+            command_type,
+        })
+    }
+
+    fn line_starts_with_username(line: &str, my_username: &str) -> bool {
+        if let Some(name) = line.split_whitespace().next() {
+            if name.starts_with('@') {
+                return &name[1..] == my_username;
+            }
+        }
+
+        false
+    }
+
     fn from_line(s: &str) -> Result<Self, ParseCommnadError> {
         if !s.starts_with('/') {
             return Err(ParseCommnadError);
