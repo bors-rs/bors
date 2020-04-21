@@ -8,11 +8,11 @@ pub struct ParseCommnadError;
 #[derive(Debug)]
 pub struct Command {
     cmd: String,
-    command_type: CommandType,
+    pub command_type: CommandType,
 }
 
 #[derive(Debug)]
-enum CommandType {
+pub enum CommandType {
     Approve(Approve),
     Unapprove,
     Land(Land),
@@ -22,7 +22,7 @@ enum CommandType {
 }
 
 #[derive(Debug)]
-struct Approve {
+pub struct Approve {
     priority: Option<Priority>,
 }
 
@@ -46,10 +46,14 @@ impl Approve {
 
         Ok(Self { priority })
     }
+
+    pub fn priority(&self) -> Option<u32> {
+        self.priority.as_ref().map(Priority::priority)
+    }
 }
 
 #[derive(Debug)]
-struct Land {
+pub struct Land {
     priority: Option<Priority>,
 }
 
@@ -73,10 +77,14 @@ impl Land {
 
         Ok(Self { priority })
     }
+
+    pub fn priority(&self) -> Option<u32> {
+        self.priority.as_ref().map(Priority::priority)
+    }
 }
 
 #[derive(Debug)]
-struct Retry {
+pub struct Retry {
     priority: Option<Priority>,
 }
 
@@ -100,10 +108,14 @@ impl Retry {
 
         Ok(Self { priority })
     }
+
+    pub fn priority(&self) -> Option<u32> {
+        self.priority.as_ref().map(Priority::priority)
+    }
 }
 
 #[derive(Debug)]
-struct Priority {
+pub struct Priority {
     priority: u32,
 }
 
@@ -131,6 +143,10 @@ impl Priority {
             //TODO better error message
             return Err(ParseCommnadError);
         }
+    }
+
+    pub fn priority(&self) -> u32 {
+        self.priority
     }
 }
 
