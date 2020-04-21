@@ -1,5 +1,6 @@
 use github::Oid;
 use serde::Deserialize;
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct PullRequestState {
@@ -19,13 +20,13 @@ pub struct PullRequestState {
 
     pub state: github::PullRequestState,
     pub is_draft: bool,
-    pub approved_by: Vec<String>,
+    pub approved_by: HashSet<String>,
     pub maintainer_can_modify: bool, // Use to enable 'rebase' merging and having github know a PR has been merged
     pub mergeable: bool,
     pub labels: Vec<String>,
 
     //tests_started_at: Instant,
-    pub priority: usize,
+    pub priority: u32,
     pub delegate: bool,
     pub merge_oid: Option<Oid>,
 }

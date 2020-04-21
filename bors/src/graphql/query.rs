@@ -107,7 +107,7 @@ impl From<list_pulls::ListPullsRepositoryPullRequestsNodes> for crate::state::Pu
             labels,
             state: state.into(),
 
-            approved_by: Vec::new(),
+            approved_by: std::collections::HashSet::new(),
             priority: 0,
             delegate: false,
             merge_oid: None,
