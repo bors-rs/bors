@@ -72,6 +72,15 @@ pub struct PullRequest {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewState {
+    Approved,
+    ChangesRequested,
+    Commented,
+    Dismissed,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct Review {
     pub id: u64,
     pub node_id: NodeId,
@@ -79,7 +88,7 @@ pub struct Review {
     pub body: Option<String>,
     pub commit_id: Oid,
     pub submitted_at: DateTime,
-    pub state: String, // Maybe make a type for this
+    pub state: ReviewState,
     pub html_url: String,
     pub pull_request_url: String,
     // pub _links
