@@ -128,6 +128,20 @@ impl Command {
         Ok(command_type)
     }
 
+    pub fn from_review(review: &github::Review) -> Option<Command> {
+        let command_type = match review.state {
+            github::ReviewState::Approved => CommandType::Approve(Approve::new()),
+            github::ReviewState::ChangesRequested => CommandType::Unapprove,
+            github::ReviewState::Commented => return None,
+            github::ReviewState::Dismissed => return None,
+        };
+
+        Some(Command {
+            cmd: "FROM REVIEW".to_owned(),
+            command_type,
+        })
+    }
+
     /// Display help information for Commands, formatted for use in Github comments
     pub fn help() -> impl std::fmt::Display {
         Help
@@ -320,6 +334,10 @@ struct Approve {
 }
 
 impl Approve {
+    fn new() -> Self {
+        Self { priority: None }
+    }
+
     fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
     where
         I: IntoIterator<Item = (&'a str, Option<&'a str>)>,

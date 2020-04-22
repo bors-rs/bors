@@ -114,6 +114,8 @@ impl EventProcessor {
             }
             Event::PullRequestReview(e) => {
                 if e.action.is_submitted() {
+                    self.process_review(&e.sender.login, e.pull_request.number, &e.review)
+                        .await;
                     self.process_comment(
                         &e.sender.login,
                         e.pull_request.number,
@@ -197,6 +199,16 @@ impl EventProcessor {
             }
             None => {
                 info!("No command in comment");
+            }
+        }
+    }
+
+    async fn process_review(&mut self, sender: &str, pr_number: u64, review: &github::Review) {
+        if let Some(command) = Command::from_review(review) {
+            let mut ctx = self.command_context(sender, pr_number).unwrap();
+            // Check if the user is authorized before executing the command
+            if command.is_authorized(&ctx).await.unwrap() {
+                command.execute(&mut ctx).await.unwrap();
             }
         }
     }
