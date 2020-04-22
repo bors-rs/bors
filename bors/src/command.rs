@@ -21,135 +21,6 @@ pub enum CommandType {
     Priority(Priority),
 }
 
-#[derive(Debug)]
-pub struct Approve {
-    priority: Option<Priority>,
-}
-
-impl Approve {
-    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
-    where
-        I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
-    {
-        let mut priority = None;
-
-        for (key, value) in iter {
-            match key {
-                "p" | "priority" => {
-                    priority = Some(Priority::from_arg(value)?);
-                }
-
-                // First key we hit that we don't understand we should just bail
-                _ => break,
-            }
-        }
-
-        Ok(Self { priority })
-    }
-
-    pub fn priority(&self) -> Option<u32> {
-        self.priority.as_ref().map(Priority::priority)
-    }
-}
-
-#[derive(Debug)]
-pub struct Land {
-    priority: Option<Priority>,
-}
-
-impl Land {
-    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
-    where
-        I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
-    {
-        let mut priority = None;
-
-        for (key, value) in iter {
-            match key {
-                "p" | "priority" => {
-                    priority = Some(Priority::from_arg(value)?);
-                }
-
-                // First key we hit that we don't understand we should just bail
-                _ => break,
-            }
-        }
-
-        Ok(Self { priority })
-    }
-
-    pub fn priority(&self) -> Option<u32> {
-        self.priority.as_ref().map(Priority::priority)
-    }
-}
-
-#[derive(Debug)]
-pub struct Retry {
-    priority: Option<Priority>,
-}
-
-impl Retry {
-    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
-    where
-        I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
-    {
-        let mut priority = None;
-
-        for (key, value) in iter {
-            match key {
-                "p" | "priority" => {
-                    priority = Some(Priority::from_arg(value)?);
-                }
-
-                // First key we hit that we don't understand we should just bail
-                _ => break,
-            }
-        }
-
-        Ok(Self { priority })
-    }
-
-    pub fn priority(&self) -> Option<u32> {
-        self.priority.as_ref().map(Priority::priority)
-    }
-}
-
-#[derive(Debug)]
-pub struct Priority {
-    priority: u32,
-}
-
-impl Priority {
-    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
-    where
-        I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
-    {
-        let mut iter = iter.into_iter();
-
-        let arg = iter
-            .next()
-            .and_then(|(k, v)| if v.is_some() { None } else { Some(k) });
-
-        Self::from_arg(arg)
-    }
-
-    fn from_arg(value: Option<&str>) -> Result<Self, ParseCommnadError> {
-        if let Some(v) = value {
-            //TODO better error message (expected integer)
-            let priority = v.parse().map_err(|_| ParseCommnadError)?;
-            Ok(Self { priority })
-        } else {
-            // No value specified
-            //TODO better error message
-            return Err(ParseCommnadError);
-        }
-    }
-
-    pub fn priority(&self) -> u32 {
-        self.priority
-    }
-}
-
 impl Command {
     pub fn from_comment(c: &str) -> Option<Result<Self, ParseCommnadError>> {
         c.lines()
@@ -283,5 +154,134 @@ impl std::fmt::Display for Help {
 
         writeln!(f)?;
         writeln!(f, "</details>")
+    }
+}
+
+#[derive(Debug)]
+pub struct Approve {
+    priority: Option<Priority>,
+}
+
+impl Approve {
+    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
+    where
+        I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
+    {
+        let mut priority = None;
+
+        for (key, value) in iter {
+            match key {
+                "p" | "priority" => {
+                    priority = Some(Priority::from_arg(value)?);
+                }
+
+                // First key we hit that we don't understand we should just bail
+                _ => break,
+            }
+        }
+
+        Ok(Self { priority })
+    }
+
+    pub fn priority(&self) -> Option<u32> {
+        self.priority.as_ref().map(Priority::priority)
+    }
+}
+
+#[derive(Debug)]
+pub struct Land {
+    priority: Option<Priority>,
+}
+
+impl Land {
+    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
+    where
+        I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
+    {
+        let mut priority = None;
+
+        for (key, value) in iter {
+            match key {
+                "p" | "priority" => {
+                    priority = Some(Priority::from_arg(value)?);
+                }
+
+                // First key we hit that we don't understand we should just bail
+                _ => break,
+            }
+        }
+
+        Ok(Self { priority })
+    }
+
+    pub fn priority(&self) -> Option<u32> {
+        self.priority.as_ref().map(Priority::priority)
+    }
+}
+
+#[derive(Debug)]
+pub struct Retry {
+    priority: Option<Priority>,
+}
+
+impl Retry {
+    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
+    where
+        I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
+    {
+        let mut priority = None;
+
+        for (key, value) in iter {
+            match key {
+                "p" | "priority" => {
+                    priority = Some(Priority::from_arg(value)?);
+                }
+
+                // First key we hit that we don't understand we should just bail
+                _ => break,
+            }
+        }
+
+        Ok(Self { priority })
+    }
+
+    pub fn priority(&self) -> Option<u32> {
+        self.priority.as_ref().map(Priority::priority)
+    }
+}
+
+#[derive(Debug)]
+pub struct Priority {
+    priority: u32,
+}
+
+impl Priority {
+    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
+    where
+        I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
+    {
+        let mut iter = iter.into_iter();
+
+        let arg = iter
+            .next()
+            .and_then(|(k, v)| if v.is_some() { None } else { Some(k) });
+
+        Self::from_arg(arg)
+    }
+
+    fn from_arg(value: Option<&str>) -> Result<Self, ParseCommnadError> {
+        if let Some(v) = value {
+            //TODO better error message (expected integer)
+            let priority = v.parse().map_err(|_| ParseCommnadError)?;
+            Ok(Self { priority })
+        } else {
+            // No value specified
+            //TODO better error message
+            return Err(ParseCommnadError);
+        }
+    }
+
+    pub fn priority(&self) -> u32 {
+        self.priority
     }
 }
