@@ -1,5 +1,6 @@
 use crate::{
-    command::Command, error::Result, graphql::GithubClient, state::PullRequestState, Config,
+    command::Command, config::RepoConfig, error::Result, graphql::GithubClient,
+    state::PullRequestState, Config,
 };
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
 use github::{Event, EventType, NodeId};
@@ -138,6 +139,23 @@ impl EventProcessor {
         }
     }
 
+    fn command_context<'a>(
+        &'a mut self,
+        sender: &'a str,
+        pr_number: u64,
+    ) -> Option<CommandContext<'a>> {
+        if let Some(pr) = self.pulls.get_mut(&pr_number) {
+            Some(CommandContext {
+                pull_request: pr,
+                github: &self.github,
+                config: self.config.repo(),
+                sender,
+            })
+        } else {
+            None
+        }
+    }
+
     async fn process_comment(
         &mut self,
         user: &str,
@@ -157,9 +175,10 @@ impl EventProcessor {
                     // TODO handle or ignore error
                     .unwrap();
 
+                let mut ctx = self.command_context(user, pr_number).unwrap();
                 // Check if the user is authorized before executing the command
-                if self.is_authorized(user, pr_number, &command).await.unwrap() {
-                    self.execute_command(user, pr_number, command).await;
+                if Self::is_authorized(&ctx, &command).await.unwrap() {
+                    Self::execute_command(&mut ctx, command).await;
                 }
             }
             Some(Err(_)) => {
@@ -183,15 +202,15 @@ impl EventProcessor {
     }
 
     // TODO handle `delegate`
-    async fn is_authorized(&self, user: &str, pr_number: u64, command: &Command) -> Result<bool> {
+    async fn is_authorized(ctx: &CommandContext<'_>, command: &Command) -> Result<bool> {
         let mut is_authorized = false;
         let mut reason = None;
 
         // Check to see if the user is a collaborator
-        if self
-            .github
+        if ctx
+            .github()
             .repos()
-            .is_collaborator(self.config.repo().owner(), self.config.repo().name(), user)
+            .is_collaborator(ctx.config().owner(), ctx.config().name(), ctx.sender())
             .await?
             .into_inner()
         {
@@ -201,110 +220,88 @@ impl EventProcessor {
         }
 
         // Check to see if the user issuing the command is attempting to approve their own PR
-        if let Some(author) = self
-            .pulls
-            .get(&pr_number)
-            .and_then(|state| state.author.as_deref())
+        use crate::command::CommandType;
+        if is_authorized
+            && !ctx.config().allow_self_review()
+            && ctx.sender_is_author()
+            && matches!(command.command_type, CommandType::Approve(_))
         {
-            use crate::command::CommandType;
-            if !self.config.repo().allow_self_review()
-                && is_authorized
-                && user == author
-                && matches!(command.command_type, CommandType::Approve(_))
-            {
-                is_authorized = false;
-                reason = Some("Can't approve your own PR");
-            }
+            is_authorized = false;
+            reason = Some("Can't approve your own PR");
         }
 
         // Post a comment to Github if there was a reason why the user wasn't authorized
         if !is_authorized {
             if let Some(reason) = reason {
-                self.github
-                    .issues()
-                    .create_comment(
-                        self.config.repo().owner(),
-                        self.config.repo().name(),
-                        pr_number,
-                        &format!("@{}: :key: Insufficient privileges: {}", user, reason),
-                    )
-                    .await?;
+                ctx.create_pr_comment(&format!(
+                    "@{}: :key: Insufficient privileges: {}",
+                    ctx.sender(),
+                    reason
+                ))
+                .await?;
             }
         }
 
         Ok(is_authorized)
     }
 
-    async fn execute_command(&mut self, user: &str, pr_number: u64, command: Command) {
+    async fn execute_command(mut ctx: &mut CommandContext<'_>, command: Command) {
         use crate::command::CommandType;
 
         match command.command_type {
             CommandType::Approve(a) => {
                 if let Some(priority) = a.priority() {
-                    self.set_priority(pr_number, priority);
+                    Self::set_priority(&mut ctx, priority);
                 }
 
-                self.approve_pr(user, pr_number).await.unwrap();
+                Self::approve_pr(&mut ctx).await.unwrap();
             }
             CommandType::Unapprove => unimplemented!(),
             CommandType::Land(l) => {
                 if let Some(priority) = l.priority() {
-                    self.set_priority(pr_number, priority);
+                    Self::set_priority(&mut ctx, priority);
                 }
 
                 unimplemented!();
             }
             CommandType::Retry(r) => {
                 if let Some(priority) = r.priority() {
-                    self.set_priority(pr_number, priority);
+                    Self::set_priority(&mut ctx, priority);
                 }
                 unimplemented!();
             }
             CommandType::Cancel => unimplemented!(),
-            CommandType::Priority(p) => self.set_priority(pr_number, p.priority()),
+            CommandType::Priority(p) => Self::set_priority(&mut ctx, p.priority()),
         }
     }
 
-    fn set_priority(&mut self, pr_number: u64, priority: u32) {
-        if let Some(pr) = self.pulls.get_mut(&pr_number) {
-            pr.priority = priority;
-        }
+    fn set_priority(ctx: &mut CommandContext, priority: u32) {
+        ctx.pr_mut().priority = priority;
     }
 
-    async fn approve_pr(&mut self, reviewer: &str, pr_number: u64) -> Result<()> {
-        if let Some(pr) = self.pulls.get_mut(&pr_number) {
-            // Skip adding approval if author matches the "reviewer"
-            if !self.config.repo().allow_self_review() {
-                match &pr.author {
-                    Some(a) if a == reviewer => return Ok(()),
-                    _ => {}
-                }
-            }
-
-            let msg = if pr.approved_by.insert(reviewer.to_owned()) {
-                // The approval was added
-                format!(
-                    ":pushpin: Commit {:7} has been approved by `{}`",
-                    pr.head_ref_oid, reviewer
-                )
-            } else {
-                // 'reviewer' had already approved the PR
-                format!(
-                    "@{} :bulb: You have already approved this PR, no need to approve it again",
-                    reviewer
-                )
-            };
-
-            self.github
-                .issues()
-                .create_comment(
-                    self.config.repo().owner(),
-                    self.config.repo().name(),
-                    pr_number,
-                    &msg,
-                )
-                .await?;
+    async fn approve_pr(ctx: &mut CommandContext<'_>) -> Result<()> {
+        // Skip adding approval if author matches the "reviewer"
+        if !ctx.config().allow_self_review() && ctx.sender_is_author() {
+            return Ok(());
         }
+
+        let reviewer = ctx.sender().to_owned();
+        let msg = if ctx.pr_mut().approved_by.insert(reviewer) {
+            // The approval was added
+            format!(
+                ":pushpin: Commit {:7} has been approved by `{}`",
+                ctx.pr().head_ref_oid,
+                ctx.sender()
+            )
+        } else {
+            // 'reviewer' had already approved the PR
+            format!(
+                "@{} :bulb: You have already approved this PR, no need to approve it again",
+                ctx.sender()
+            )
+        };
+
+        ctx.create_pr_comment(&msg).await?;
 
         Ok(())
     }
@@ -327,5 +324,55 @@ impl EventProcessor {
             .extend(pulls.into_iter().map(|pr| (pr.number, pr)));
 
         info!("Done Synchronizing");
+    }
+}
+
+struct CommandContext<'a> {
+    pull_request: &'a mut PullRequestState,
+    github: &'a GithubClient,
+    config: &'a RepoConfig,
+    sender: &'a str,
+}
+
+impl<'a> CommandContext<'a> {
+    fn pr(&self) -> &PullRequestState {
+        &self.pull_request
+    }
+
+    fn pr_mut(&mut self) -> &mut PullRequestState {
+        &mut self.pull_request
+    }
+
+    fn github(&self) -> &GithubClient {
+        &self.github
+    }
+
+    fn config(&self) -> &RepoConfig {
+        &self.config
+    }
+
+    fn sender(&self) -> &str {
+        &self.sender
+    }
+
+    fn sender_is_author(&self) -> bool {
+        if let Some(author) = &self.pull_request.author {
+            author == self.sender
+        } else {
+            false
+        }
+    }
+
+    async fn create_pr_comment(&self, body: &str) -> Result<()> {
+        self.github()
+            .issues()
+            .create_comment(
+                self.config().owner(),
+                self.config().name(),
+                self.pr().number,
+                body,
+            )
+            .await?;
+        Ok(())
     }
 }
