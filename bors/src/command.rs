@@ -1,4 +1,6 @@
 //! Defines commands which can be asked to be performed
+
+use crate::{event_processor::CommandContext, Result};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -112,6 +114,108 @@ impl Command {
     /// Display help information for Commands, formatted for use in Github comments
     pub fn help() -> impl std::fmt::Display {
         Help
+    }
+
+    // TODO handle `delegate`
+    pub async fn is_authorized(&self, ctx: &CommandContext<'_>) -> Result<bool> {
+        let mut is_authorized = false;
+        let mut reason = None;
+
+        // Check to see if the user is a collaborator
+        if ctx
+            .github()
+            .repos()
+            .is_collaborator(ctx.config().owner(), ctx.config().name(), ctx.sender())
+            .await?
+            .into_inner()
+        {
+            is_authorized = true;
+        } else {
+            reason = Some("Not Collaborator");
+        }
+
+        // Check to see if the user issuing the command is attempting to approve their own PR
+        if is_authorized
+            && !ctx.config().allow_self_review()
+            && ctx.sender_is_author()
+            && matches!(self.command_type, CommandType::Approve(_))
+        {
+            is_authorized = false;
+            reason = Some("Can't approve your own PR");
+        }
+
+        // Post a comment to Github if there was a reason why the user wasn't authorized
+        if !is_authorized {
+            if let Some(reason) = reason {
+                ctx.create_pr_comment(&format!(
+                    "@{}: :key: Insufficient privileges: {}",
+                    ctx.sender(),
+                    reason
+                ))
+                .await?;
+            }
+        }
+
+        Ok(is_authorized)
+    }
+
+    pub async fn execute(&self, mut ctx: &mut CommandContext<'_>) {
+        match &self.command_type {
+            CommandType::Approve(a) => {
+                if let Some(priority) = a.priority() {
+                    Self::set_priority(&mut ctx, priority);
+                }
+
+                Self::approve_pr(&mut ctx).await.unwrap();
+            }
+            CommandType::Unapprove => unimplemented!(),
+            CommandType::Land(l) => {
+                if let Some(priority) = l.priority() {
+                    Self::set_priority(&mut ctx, priority);
+                }
+
+                unimplemented!();
+            }
+            CommandType::Retry(r) => {
+                if let Some(priority) = r.priority() {
+                    Self::set_priority(&mut ctx, priority);
+                }
+                unimplemented!();
+            }
+            CommandType::Cancel => unimplemented!(),
+            CommandType::Priority(p) => Self::set_priority(&mut ctx, p.priority()),
+        }
+    }
+
+    fn set_priority(ctx: &mut CommandContext, priority: u32) {
+        ctx.pr_mut().priority = priority;
+    }
+
+    async fn approve_pr(ctx: &mut CommandContext<'_>) -> Result<()> {
+        // Skip adding approval if author matches the "reviewer"
+        if !ctx.config().allow_self_review() && ctx.sender_is_author() {
+            return Ok(());
+        }
+
+        let reviewer = ctx.sender().to_owned();
+        let msg = if ctx.pr_mut().approved_by.insert(reviewer) {
+            // The approval was added
+            format!(
+                ":pushpin: Commit {:7} has been approved by `{}`",
+                ctx.pr().head_ref_oid,
+                ctx.sender()
+            )
+        } else {
+            // 'reviewer' had already approved the PR
+            format!(
+                "@{} :bulb: You have already approved this PR, no need to approve it again",
+                ctx.sender()
+            )
+        };
+
+        ctx.create_pr_comment(&msg).await?;
+
+        Ok(())
     }
 }
 
