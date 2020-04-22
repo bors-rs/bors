@@ -178,7 +178,7 @@ impl EventProcessor {
                 let mut ctx = self.command_context(user, pr_number).unwrap();
                 // Check if the user is authorized before executing the command
                 if command.is_authorized(&ctx).await.unwrap() {
-                    command.execute(&mut ctx).await;
+                    command.execute(&mut ctx).await.unwrap();
                 }
             }
             Some(Err(_)) => {

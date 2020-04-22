@@ -1,6 +1,7 @@
 //! Defines commands which can be asked to be performed
 
 use crate::{event_processor::CommandContext, Result};
+use log::info;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -10,17 +11,32 @@ pub struct ParseCommnadError;
 #[derive(Debug)]
 pub struct Command {
     cmd: String,
-    pub command_type: CommandType,
+    command_type: CommandType,
 }
 
 #[derive(Debug)]
-pub enum CommandType {
+enum CommandType {
     Approve(Approve),
     Unapprove,
     Land(Land),
     Retry(Retry),
     Cancel,
+    Help,
     Priority(Priority),
+}
+
+impl CommandType {
+    fn name(&self) -> &'static str {
+        match &self {
+            CommandType::Approve(_) => "Approve",
+            CommandType::Unapprove => "Unapprove",
+            CommandType::Land(_) => "Land",
+            CommandType::Retry(_) => "Retry",
+            CommandType::Cancel => "Cancel",
+            CommandType::Help => "Help",
+            CommandType::Priority(_) => "Priority",
+        }
+    }
 }
 
 impl Command {
@@ -103,6 +119,7 @@ impl Command {
             "land" | "merge" => CommandType::Land(Land::with_args(args)?),
             "retry" => CommandType::Retry(Retry::with_args(args)?),
             "cancel" | "stop" => CommandType::Cancel,
+            "help" | "h" => CommandType::Help,
             "priority" => CommandType::Priority(Priority::with_args(args)?),
 
             _ => return Err(ParseCommnadError),
@@ -116,7 +133,6 @@ impl Command {
         Help
     }
 
-    // TODO handle `delegate`
     pub async fn is_authorized(&self, ctx: &CommandContext<'_>) -> Result<bool> {
         let mut is_authorized = false;
         let mut reason = None;
@@ -159,16 +175,18 @@ impl Command {
         Ok(is_authorized)
     }
 
-    pub async fn execute(&self, mut ctx: &mut CommandContext<'_>) {
+    pub async fn execute(&self, mut ctx: &mut CommandContext<'_>) -> Result<()> {
+        info!("Executing command '{}'", self.command_type.name());
+
         match &self.command_type {
             CommandType::Approve(a) => {
                 if let Some(priority) = a.priority() {
                     Self::set_priority(&mut ctx, priority);
                 }
 
-                Self::approve_pr(&mut ctx).await.unwrap();
+                Self::approve_pr(&mut ctx).await?;
             }
-            CommandType::Unapprove => unimplemented!(),
+            CommandType::Unapprove => Self::unapprove_pr(ctx).await?,
             CommandType::Land(l) => {
                 if let Some(priority) = l.priority() {
                     Self::set_priority(&mut ctx, priority);
@@ -183,11 +201,15 @@ impl Command {
                 unimplemented!();
             }
             CommandType::Cancel => unimplemented!(),
+            CommandType::Help => ctx.create_pr_comment(&Help.to_string()).await?,
             CommandType::Priority(p) => Self::set_priority(&mut ctx, p.priority()),
         }
+
+        Ok(())
     }
 
     fn set_priority(ctx: &mut CommandContext, priority: u32) {
+        info!("#{}: set priority to {}", ctx.pr().number, priority);
         ctx.pr_mut().priority = priority;
     }
 
@@ -196,6 +218,17 @@ impl Command {
         if !ctx.config().allow_self_review() && ctx.sender_is_author() {
             return Ok(());
         }
+
+        // Skip adding approval on draft PRs
+        if ctx.pr().is_draft() {
+            ctx.create_pr_comment(
+                ":clipboard: Looks like this PR is still in progress, ignoring approval",
+            )
+            .await?;
+            return Ok(());
+        }
+
+        info!("#{}: approved by '{}'", ctx.pr().number, ctx.sender());
 
         let reviewer = ctx.sender().to_owned();
         let msg = if ctx.pr_mut().approved_by.insert(reviewer) {
@@ -214,6 +247,25 @@ impl Command {
         };
 
         ctx.create_pr_comment(&msg).await?;
+
+        Ok(())
+    }
+
+    async fn unapprove_pr(ctx: &mut CommandContext<'_>) -> Result<()> {
+        info!(
+            "#{}: '{}' revoked their approval",
+            ctx.pr().number,
+            ctx.sender()
+        );
+
+        let reviewer = ctx.sender().to_owned();
+        if ctx.pr_mut().approved_by.remove(&reviewer) {
+            ctx.create_pr_comment(&format!(
+                ":anguished: `{}`'s approval has been revoked",
+                ctx.sender()
+            ))
+            .await?;
+        }
 
         Ok(())
     }
@@ -251,6 +303,7 @@ impl std::fmt::Display for Help {
             "- __Retry__ `retry`: attempt to retry the last action (usually a land/merge)"
         )?;
         writeln!(f, "- __Cancel__ `cancel`, `stop`: stop an in-progress land")?;
+        writeln!(f, "- __Help__ `help`, `h`: show this help message")?;
         writeln!(
             f,
             "- __Priority__ `priority`: set the priority level for a PR"
@@ -262,7 +315,7 @@ impl std::fmt::Display for Help {
 }
 
 #[derive(Debug)]
-pub struct Approve {
+struct Approve {
     priority: Option<Priority>,
 }
 
@@ -287,13 +340,13 @@ impl Approve {
         Ok(Self { priority })
     }
 
-    pub fn priority(&self) -> Option<u32> {
+    fn priority(&self) -> Option<u32> {
         self.priority.as_ref().map(Priority::priority)
     }
 }
 
 #[derive(Debug)]
-pub struct Land {
+struct Land {
     priority: Option<Priority>,
 }
 
@@ -318,13 +371,13 @@ impl Land {
         Ok(Self { priority })
     }
 
-    pub fn priority(&self) -> Option<u32> {
+    fn priority(&self) -> Option<u32> {
         self.priority.as_ref().map(Priority::priority)
     }
 }
 
 #[derive(Debug)]
-pub struct Retry {
+struct Retry {
     priority: Option<Priority>,
 }
 
@@ -349,13 +402,13 @@ impl Retry {
         Ok(Self { priority })
     }
 
-    pub fn priority(&self) -> Option<u32> {
+    fn priority(&self) -> Option<u32> {
         self.priority.as_ref().map(Priority::priority)
     }
 }
 
 #[derive(Debug)]
-pub struct Priority {
+struct Priority {
     priority: u32,
 }
 
@@ -385,7 +438,7 @@ impl Priority {
         }
     }
 
-    pub fn priority(&self) -> u32 {
+    fn priority(&self) -> u32 {
         self.priority
     }
 }

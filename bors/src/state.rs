@@ -31,6 +31,17 @@ pub struct PullRequestState {
     pub merge_oid: Option<Oid>,
 }
 
+impl PullRequestState {
+    /// Check if either the PR is marked as being draft or if the PR title seems to indicate that
+    /// it is still "WIP"
+    pub fn is_draft(&self) -> bool {
+        self.is_draft
+            || ["WIP", "TODO", "[WIP]", "[TODO]"]
+                .iter()
+                .any(|s| self.title.starts_with(s))
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Repo {
     owner: String,
