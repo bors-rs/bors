@@ -327,7 +327,7 @@ impl EventProcessor {
     }
 }
 
-struct CommandContext<'a> {
+pub struct CommandContext<'a> {
     pull_request: &'a mut PullRequestState,
     github: &'a GithubClient,
     config: &'a RepoConfig,
@@ -335,27 +335,27 @@ struct CommandContext<'a> {
 }
 
 impl<'a> CommandContext<'a> {
-    fn pr(&self) -> &PullRequestState {
+    pub fn pr(&self) -> &PullRequestState {
         &self.pull_request
     }
 
-    fn pr_mut(&mut self) -> &mut PullRequestState {
+    pub fn pr_mut(&mut self) -> &mut PullRequestState {
         &mut self.pull_request
     }
 
-    fn github(&self) -> &GithubClient {
+    pub fn github(&self) -> &GithubClient {
         &self.github
     }
 
-    fn config(&self) -> &RepoConfig {
+    pub fn config(&self) -> &RepoConfig {
         &self.config
     }
 
-    fn sender(&self) -> &str {
+    pub fn sender(&self) -> &str {
         &self.sender
     }
 
-    fn sender_is_author(&self) -> bool {
+    pub fn sender_is_author(&self) -> bool {
         if let Some(author) = &self.pull_request.author {
             author == self.sender
         } else {
@@ -363,7 +363,7 @@ impl<'a> CommandContext<'a> {
         }
     }
 
-    async fn create_pr_comment(&self, body: &str) -> Result<()> {
+    pub async fn create_pr_comment(&self, body: &str) -> Result<()> {
         self.github()
             .issues()
             .create_comment(
