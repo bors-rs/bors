@@ -17,12 +17,12 @@ pub enum EventType {
     DeployKey,
     Deployment,
     DeploymentStatus,
-    // DEPRICATED: Download
-    // DEPRICATED: Follow
+    // DEPRECATED: Download
+    // DEPRECATED: Follow
     Fork,
-    // DEPRICATED: ForkApply
+    // DEPRECATED: ForkApply
     GithubAppAuthorization,
-    // DEPRICATED: Gist
+    // DEPRECATED: Gist
     Gollum,
     Installation,
     InstallationRepositories,
@@ -47,6 +47,7 @@ pub enum EventType {
     PullRequestReview,
     PullRequestReviewComment,
     Push,
+    RegistryPackage, // DEPRECATED
     Release,
     Repository,
     RepositoryDispatch,
@@ -108,6 +109,7 @@ impl FromStr for EventType {
             "pull_request_review" => Ok(PullRequestReview),
             "pull_request_review_comment" => Ok(PullRequestReviewComment),
             "push" => Ok(Push),
+            "registry_package" => Ok(RegistryPackage),
             "release" => Ok(Release),
             "repository_dispatch" => Ok(RepositoryDispatch),
             "repository" => Ok(Repository),
@@ -132,7 +134,7 @@ impl<'de> Deserialize<'de> for EventType {
         D: de::Deserializer<'de>,
     {
         let s = <String>::deserialize(deserializer)?;
-        Self::from_str(&s).map_err(de::Error::custom)
+        Self::from_str(&s).map_err(|e| de::Error::custom(format!("{}: {}", e, s)))
     }
 }
 
@@ -234,6 +236,7 @@ impl Event {
                 Event::PullRequestReviewComment(serde_json::from_slice(json)?)
             }
             EventType::Push => Event::Push(serde_json::from_slice(json)?),
+            EventType::RegistryPackage => unimplemented!(), // This is a deprecated type
             EventType::Release => Event::Release(serde_json::from_slice(json)?),
             EventType::Repository => Event::Repository(serde_json::from_slice(json)?),
             EventType::RepositoryDispatch => {
