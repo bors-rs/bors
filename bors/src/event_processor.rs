@@ -1,6 +1,6 @@
 use crate::{
-    command::Command, config::RepoConfig, error::Result, graphql::GithubClient,
-    state::PullRequestState, Config,
+    command::Command, config::RepoConfig, graphql::GithubClient, state::PullRequestState, Config,
+    Result,
 };
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
 use github::{Event, EventType, NodeId};
