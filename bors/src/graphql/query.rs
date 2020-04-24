@@ -111,6 +111,7 @@ impl From<list_pulls::ListPullsRepositoryPullRequestsNodes> for crate::state::Pu
             priority: 0,
             delegate: false,
             merge_oid: None,
+            status: crate::state::Status::InReview,
         }
     }
 }

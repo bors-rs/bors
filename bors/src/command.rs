@@ -198,7 +198,7 @@ impl Command {
                     Self::set_priority(&mut ctx, priority);
                 }
 
-                Self::approve_pr(&mut ctx).await?;
+                Self::approve_pr(&mut ctx, false).await?;
             }
             CommandType::Unapprove => Self::unapprove_pr(ctx).await?,
             CommandType::Land(l) => {
@@ -206,7 +206,8 @@ impl Command {
                     Self::set_priority(&mut ctx, priority);
                 }
 
-                unimplemented!();
+                Self::approve_pr(&mut ctx, true).await?;
+                Self::mark_pr_ready_to_land(&mut ctx).await?;
             }
             CommandType::Retry(r) => {
                 if let Some(priority) = r.priority() {
@@ -214,7 +215,7 @@ impl Command {
                 }
                 unimplemented!();
             }
-            CommandType::Cancel => unimplemented!(),
+            CommandType::Cancel => Self::cancel_land(ctx),
             CommandType::Help => ctx.create_pr_comment(&Help.to_string()).await?,
             CommandType::Priority(p) => Self::set_priority(&mut ctx, p.priority()),
         }
@@ -227,7 +228,7 @@ impl Command {
         ctx.pr_mut().priority = priority;
     }
 
-    async fn approve_pr(ctx: &mut CommandContext<'_>) -> Result<()> {
+    async fn approve_pr(ctx: &mut CommandContext<'_>, is_land_command: bool) -> Result<()> {
         // Skip adding approval if author matches the "reviewer"
         if !ctx.config().allow_self_review() && ctx.sender_is_author() {
             return Ok(());
@@ -245,22 +246,22 @@ impl Command {
         info!("#{}: approved by '{}'", ctx.pr().number, ctx.sender());
 
         let reviewer = ctx.sender().to_owned();
-        let msg = if ctx.pr_mut().approved_by.insert(reviewer) {
+        if ctx.pr_mut().approved_by.insert(reviewer) {
             // The approval was added
-            format!(
+            let msg = format!(
                 ":pushpin: Commit {:7} has been approved by `{}`",
                 ctx.pr().head_ref_oid,
                 ctx.sender()
-            )
-        } else {
+            );
+            ctx.create_pr_comment(&msg).await?;
+        } else if !is_land_command {
             // 'reviewer' had already approved the PR
-            format!(
+            let msg = format!(
                 "@{} :bulb: You have already approved this PR, no need to approve it again",
                 ctx.sender()
-            )
-        };
-
-        ctx.create_pr_comment(&msg).await?;
+            );
+            ctx.create_pr_comment(&msg).await?;
+        }
 
         Ok(())
     }
@@ -282,6 +283,53 @@ impl Command {
         }
 
         Ok(())
+    }
+
+    async fn mark_pr_ready_to_land(ctx: &mut CommandContext<'_>) -> Result<()> {
+        use crate::state::Status;
+
+        info!("attempting to mark pr #{} ReadyToLand", ctx.pr().number);
+
+        let msg = match ctx.pr().status {
+            Status::InReview => {
+                if ctx.pr().approved_by.is_empty() {
+                    info!(
+                        "pr #{} is missing approvals, unable to queue for landing",
+                        ctx.pr().number
+                    );
+
+                    format!(
+                        "@{} :exclamation: This PR is still missing approvals, unable to queue for landing",
+                        ctx.sender(),
+                    )
+                } else {
+                    ctx.pr_mut().status = Status::ReadyToLand;
+                    info!("pr #{} queued for landing", ctx.pr().number);
+
+                    ":mailbox_with_mail: queued for landing".to_string()
+                }
+            }
+            Status::ReadyToLand => {
+                info!("pr #{} already queued for landing", ctx.pr().number);
+
+                format!(
+                    "@{} :bulb: This PR is already queued for landing",
+                    ctx.sender(),
+                )
+            }
+        };
+
+        ctx.create_pr_comment(&msg).await?;
+
+        Ok(())
+    }
+
+    fn cancel_land(ctx: &mut CommandContext<'_>) {
+        use crate::state::Status;
+
+        info!("Canceling land of pr #{}", ctx.pr().number);
+
+        ctx.pr_mut().status = Status::InReview;
     }
 }
 

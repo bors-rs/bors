@@ -29,6 +29,15 @@ pub struct PullRequestState {
     pub priority: u32,
     pub delegate: bool,
     pub merge_oid: Option<Oid>,
+    pub status: Status,
+}
+
+#[derive(Debug)]
+pub enum Status {
+    InReview,
+    /// Queued for landing
+    ReadyToLand,
+    // TODO add a 'Testing' variant
 }
 
 impl PullRequestState {
