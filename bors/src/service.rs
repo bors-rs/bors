@@ -14,7 +14,7 @@ pub struct ServeOptions {
 //TODO Make sure to join and await on all of the JoinHandles of the tasks that get spawned
 pub async fn run_serve(config: Config, options: &ServeOptions) -> Result<()> {
     let secret = config.secret.clone();
-    let (tx, event_processor) = EventProcessor::new(config);
+    let (tx, event_processor) = EventProcessor::new(config)?;
     tokio::spawn(event_processor.start());
 
     let mut builder = probot::Server::builder();

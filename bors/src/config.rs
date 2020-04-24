@@ -1,9 +1,14 @@
 use crate::{state::Repo, Result};
 use serde::Deserialize;
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    pub git: GitConfig,
     pub repo: RepoConfig,
     pub secret: Option<String>,
     pub github_api_token: String,
@@ -22,6 +27,14 @@ impl Config {
     pub fn repo(&self) -> &RepoConfig {
         &self.repo
     }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct GitConfig {
+    pub ssh_key_file: PathBuf,
+    pub user: String,
+    pub email: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,6 +58,10 @@ pub struct RepoConfig {
 }
 
 impl RepoConfig {
+    pub fn repo(&self) -> &Repo {
+        &self.repo
+    }
+
     pub fn owner(&self) -> &str {
         self.repo.owner()
     }

@@ -42,7 +42,7 @@ impl PullRequestState {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Repo {
     owner: String,
     name: String,
@@ -62,5 +62,9 @@ impl Repo {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn to_github_ssh_url(&self) -> String {
+        format!("git@github.com:{}/{}.git", self.owner, self.name)
     }
 }

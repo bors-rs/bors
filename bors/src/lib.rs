@@ -1,6 +1,7 @@
 mod command;
 mod config;
 mod event_processor;
+mod git;
 mod graphql;
 mod service;
 mod state;

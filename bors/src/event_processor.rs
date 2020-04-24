@@ -1,6 +1,6 @@
 use crate::{
-    command::Command, config::RepoConfig, graphql::GithubClient, state::PullRequestState, Config,
-    Result,
+    command::Command, config::RepoConfig, git::GitRepository, graphql::GithubClient,
+    state::PullRequestState, Config, Result,
 };
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
 use github::{Event, EventType, NodeId};
@@ -57,26 +57,29 @@ impl probot::Service for EventProcessorSender {
 pub struct EventProcessor {
     config: Config,
     github: GithubClient,
+    git_repository: GitRepository,
     pulls: HashMap<u64, PullRequestState>,
     db: Mutex<HotPot>,
     requests_rx: mpsc::Receiver<Request>,
 }
 
 impl EventProcessor {
-    pub fn new(config: Config) -> (EventProcessorSender, Self) {
+    pub fn new(config: Config) -> Result<(EventProcessorSender, Self)> {
         let (tx, rx) = mpsc::channel(1024);
         let github = GithubClient::new(&config.github_api_token);
+        let git_repository = GitRepository::from_config(&config)?;
 
-        (
+        Ok((
             EventProcessorSender::new(tx),
             Self {
                 config,
                 github,
+                git_repository,
                 pulls: HashMap::new(),
                 db: Mutex::new(HotPot::new()),
                 requests_rx: rx,
             },
-        )
+        ))
     }
 
     pub async fn start(mut self) {
