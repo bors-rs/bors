@@ -1,5 +1,6 @@
 use crate::{config::GitConfig, state::Repo, Config, Result};
 use anyhow::{anyhow, Context};
+use github::Oid;
 use log::info;
 use std::{
     path::{Path, PathBuf},
@@ -24,18 +25,23 @@ impl GitRepository {
         directory.push(github_repo.owner());
         directory.push(github_repo.name());
 
-        if !Git::is_git_repo(&directory)? {
+        if !Git::new().current_dir(&directory).is_git_repo()? {
             info!(
                 "cloning '{}' to '{}'",
                 github_repo.to_github_ssh_url(),
                 directory.display()
             );
-            Git::clone(&directory, &github_repo, &git_config.ssh_key_file)?;
+            Git::new()
+                .with_ssh(&git_config.ssh_key_file)
+                .clone(&directory, &github_repo)?;
         } else {
             info!("using existing on-disk repo at {}", directory.display());
         }
 
-        if !Git::remote_matches_github_repo(&directory, &github_repo)? {
+        if !Git::new()
+            .current_dir(&directory)
+            .remote_matches_github_repo(&github_repo)?
+        {
             return Err(anyhow!(
                 "on-disk repo's 'origin' remote doesn't match config"
             ));
@@ -47,6 +53,48 @@ impl GitRepository {
             git_config,
         })
     }
+
+    pub fn fetch_and_rebase(
+        &mut self,
+        base_ref: &str,
+        head_oid: &Oid,
+        branch: &str,
+    ) -> Result<Option<Oid>> {
+        // Fetch base ref and head_oid
+        self.fetch(base_ref, head_oid)?;
+        let base_oid = self.git().ref_to_oid(&format!("origin/{}", base_ref))?;
+        self.rebase(&base_oid, head_oid, branch)
+    }
+
+    fn fetch(&mut self, base_ref: &str, oid: &Oid) -> Result<()> {
+        self.git()
+            .with_ssh(&self.git_config.ssh_key_file)
+            .fetch(&[base_ref, &oid.to_string()])
+    }
+
+    // None represents a Merge conflict
+    fn rebase(&mut self, base_oid: &Oid, head_oid: &Oid, branch: &str) -> Result<Option<Oid>> {
+        // First create the branch to work on for the rebase
+        self.git().create_branch(branch, head_oid)?;
+
+        // Attempt to perform the rebase
+        if self.git().rebase(base_oid).is_err() {
+            // the rebase failed, probably due to a merge conflict so we need to reset the state of
+            // the tree and abort the rebase
+            self.git().rebase_abort()?;
+            Ok(None)
+        } else {
+            let head_oid = self.git().head_oid()?;
+            Ok(Some(head_oid))
+        }
+    }
+
+    fn git(&self) -> Git {
+        Git::new()
+            .current_dir(&self.directory)
+            .with_user(&self.git_config.user)
+            .with_email(&self.git_config.email)
+    }
 }
 
 struct Git {
@@ -54,19 +102,51 @@ struct Git {
 }
 
 impl Git {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let mut inner = Command::new("git");
 
-        // Stop git looking at directories above the `REPOS_DIR`
-        inner.env(
-            "GIT_CEILING_DIRECTORIES",
-            std::env::current_dir().unwrap().join(REPOS_DIR),
-        );
+        inner
+            // Stop git looking at directories above the `REPOS_DIR`
+            .env(
+                "GIT_CEILING_DIRECTORIES",
+                std::env::current_dir().unwrap().join(REPOS_DIR),
+            )
+            // Don't try and open an editor for things like `rebase -i`
+            .env("GIT_EDITOR", "cat");
 
         Self { inner }
     }
 
-    fn run(&mut self) -> Result<String> {
+    // Use `-C <path>` instead of `Command::current_dir` so that attempting to run a command in a
+    // didirectory that doesn't exist doesn't fail to run the command but instead will succeed with
+    // a non-zero exit code
+    pub fn current_dir(mut self, path: &Path) -> Self {
+        // self.inner.current_dir(path);
+        self.inner.arg("-C").arg(path);
+        self
+    }
+
+    pub fn with_ssh(mut self, ssh_key_file: &Path) -> Self {
+        self.inner.env(
+            "GIT_SSH_COMMAND",
+            format!("ssh -i {} -S none", ssh_key_file.display()),
+        );
+        self
+    }
+
+    pub fn with_user(mut self, user: &str) -> Self {
+        self.inner.env("GIT_AUTHOR_NAME", user);
+        self.inner.env("GIT_COMMITTER_NAME", user);
+        self
+    }
+
+    pub fn with_email(mut self, email: &str) -> Self {
+        self.inner.env("GIT_AUTHOR_EMAIL", email);
+        self.inner.env("GIT_COMMITTER_EMAIL", email);
+        self
+    }
+
+    fn run(mut self) -> Result<String> {
         let output = self.inner.output()?;
 
         if !output.status.success() {
@@ -79,13 +159,9 @@ impl Git {
         Ok(String::from_utf8(output.stdout)?)
     }
 
-    pub fn is_git_repo(path: &Path) -> Result<bool> {
-        if !path.exists() {
-            return Ok(false);
-        }
-
-        let output = Self::new()
-            .current_dir(path)
+    pub fn is_git_repo(mut self) -> Result<bool> {
+        let output = self
+            .inner
             .args(&["rev-parse", "--git-dir"])
             .output()
             .context("checking if a directory is a git repo")?;
@@ -93,40 +169,62 @@ impl Git {
         Ok(output.status.success())
     }
 
-    pub fn remote_matches_github_repo(path: &Path, github_repo: &Repo) -> Result<bool> {
-        let mut cmd = Self::new();
-        cmd.current_dir(path).args(&["remote", "get-url", "origin"]);
-        let output = cmd.run()?;
+    pub fn remote_matches_github_repo(mut self, github_repo: &Repo) -> Result<bool> {
+        self.inner.args(&["remote", "get-url", "origin"]);
+        let output = self.run()?;
 
         Ok(output.trim() == github_repo.to_github_ssh_url())
     }
 
-    fn git_ssh_command(ssh_key_file: &Path) -> String {
-        format!("ssh -i {} -S none", ssh_key_file.display())
-    }
-
-    pub fn clone(path: &Path, github_repo: &Repo, ssh_key_file: &Path) -> Result<()> {
-        let mut cmd = Self::new();
-        cmd.env("GIT_SSH_COMMAND", Self::git_ssh_command(ssh_key_file))
+    pub fn clone(mut self, path: &Path, github_repo: &Repo) -> Result<()> {
+        self.inner
             .arg("clone")
             .arg(github_repo.to_github_ssh_url())
             .arg(path);
-        cmd.run()
+        self.run()
             .with_context(|| format!("cloning {}", github_repo.to_github_ssh_url()))?;
         Ok(())
     }
-}
 
-impl std::ops::Deref for Git {
-    type Target = Command;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
+    pub fn fetch<I, S>(mut self, refspec: I) -> Result<()>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        self.inner.arg("fetch").arg("origin").args(refspec);
+        self.run()?;
+        Ok(())
     }
-}
 
-impl std::ops::DerefMut for Git {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+    pub fn create_branch(mut self, branch_name: &str, oid: &Oid) -> Result<()> {
+        self.inner
+            .args(&["checkout", "-B", branch_name])
+            .arg(oid.to_string());
+        self.run()?;
+        Ok(())
+    }
+
+    pub fn rebase_abort(mut self) -> Result<()> {
+        self.inner.args(&["rebase", "--abort"]);
+        self.run()?;
+        Ok(())
+    }
+
+    pub fn rebase(mut self, base_oid: &Oid) -> Result<()> {
+        self.inner
+            .args(&["rebase", "-i", "--autosquash"])
+            .arg(base_oid.to_string());
+        self.run()?;
+        Ok(())
+    }
+
+    pub fn head_oid(mut self) -> Result<Oid> {
+        self.ref_to_oid("HEAD")
+    }
+
+    pub fn ref_to_oid(mut self, r: &str) -> Result<Oid> {
+        self.inner.args(&["rev-parse", r]);
+        let output = self.run()?;
+        Ok(Oid::from_str(output.trim()))
     }
 }

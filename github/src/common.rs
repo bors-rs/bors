@@ -13,6 +13,12 @@ impl NodeId {
 #[derive(Clone, Debug, Deserialize)]
 pub struct Oid(String);
 
+impl Oid {
+    pub fn from_str<S: Into<String>>(s: S) -> Self {
+        Oid(s.into())
+    }
+}
+
 impl fmt::Display for Oid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
