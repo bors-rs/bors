@@ -5,7 +5,7 @@ use crate::{
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
 use github::{Event, EventType, NodeId};
 use hotpot_db::HotPot;
-use log::info;
+use log::{info, warn};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -104,7 +104,7 @@ impl EventProcessor {
 
         //TODO route on the request
         match &event {
-            Event::PullRequest(_e) => {}
+            Event::PullRequest(e) => self.handle_pull_request_event(e),
             Event::IssueComment(e) => {
                 // Only process commands from newly created comments
                 if e.action.is_created() && e.issue.is_pull_request() {
@@ -146,6 +146,50 @@ impl EventProcessor {
         }
 
         self.process_merge_queue().await
+    }
+
+    fn handle_pull_request_event(&mut self, event: &github::PullRequestEvent) {
+        use github::PullRequestEventAction;
+
+        info!(
+            "Handling PullRequestEvent '{:?}' for PR #{}",
+            event.action, event.pull_request.number
+        );
+
+        match event.action {
+            PullRequestEventAction::Synchronize => {
+                if let Some(pr) = self.pulls.get_mut(&event.pull_request.number) {
+                    pr.update_head(event.pull_request.head.sha.clone())
+                }
+            }
+            PullRequestEventAction::Opened | PullRequestEventAction::Reopened => {
+                let state = PullRequestState::from_pull_request(&event.pull_request);
+
+                info!("PR #{} Opened", state.number);
+
+                if self.pulls.insert(state.number, state).is_some() {
+                    warn!("Opened/Reopened event replaced an existing PullRequestState");
+                }
+            }
+            PullRequestEventAction::Closed => {
+                // From [Github's API docs](https://developer.github.com/v3/activity/events/types/#events-api-payload-31):
+                //      If the action is closed and the merged key is false, the pull request was
+                //      closed with unmerged commits. If the action is closed and the merged key
+                //      is true, the pull request was merged.
+                let merged = event.pull_request.merged.unwrap_or(false);
+
+                if merged {
+                    info!("pr #{} successfully Merged!", event.pull_request.number);
+                }
+
+                // XXX Do we need to call into the MergeQueue to notify it that a PR was merged or
+                // closed?
+                self.pulls.remove(&event.pull_request.number);
+            }
+
+            // Do nothing for actions we're not interested in
+            _ => {}
+        }
     }
 
     async fn process_merge_queue(&mut self) {
