@@ -3,6 +3,7 @@
 use reqwest::{header, Client as ReqwestClient, Method, RequestBuilder};
 
 mod error;
+mod git;
 #[cfg(feature = "graphql")]
 mod graphql;
 mod issues;
@@ -15,6 +16,7 @@ mod reactions;
 mod repos;
 
 pub use error::{Error, Result};
+pub use git::GitClient;
 #[cfg(feature = "graphql")]
 pub use graphql::GraphqlClient;
 pub use issues::IssuesClient;
@@ -402,8 +404,11 @@ impl Client {
     // TODO gists endpoint
     // https://developer.github.com/v3/gists/
 
-    // TODO git endpoint
+    // git endpoint
     // https://developer.github.com/v3/git/
+    pub fn git(&self) -> GitClient {
+        GitClient::new(&self)
+    }
 
     // TODO gitignore endpoint
     // https://developer.github.com/v3/gitignore/
