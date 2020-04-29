@@ -37,7 +37,8 @@ pub enum Status {
     InReview,
     /// Queued for landing
     ReadyToLand,
-    // TODO add a 'Testing' variant
+    Testing,
+    // TODO add a Success state
 }
 
 impl PullRequestState {

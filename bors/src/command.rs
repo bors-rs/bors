@@ -309,7 +309,7 @@ impl Command {
                     ":mailbox_with_mail: queued for landing".to_string()
                 }
             }
-            Status::ReadyToLand => {
+            Status::ReadyToLand | Status::Testing => {
                 info!("pr #{} already queued for landing", ctx.pr().number);
 
                 format!(

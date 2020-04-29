@@ -54,6 +54,20 @@ impl GitRepository {
         })
     }
 
+    pub fn push_branch(&mut self, branch: &str) -> Result<()> {
+        self.git().push_branch(branch, true)
+    }
+
+    pub fn push_to_remote(
+        &mut self,
+        repo: &Repo,
+        branch: &str,
+        old_oid: &Oid,
+        new_oid: &Oid,
+    ) -> Result<()> {
+        self.git().push_to_remote(repo, branch, old_oid, new_oid)
+    }
+
     pub fn fetch_and_rebase(
         &mut self,
         base_ref: &str,
@@ -67,9 +81,7 @@ impl GitRepository {
     }
 
     fn fetch(&mut self, base_ref: &str, oid: &Oid) -> Result<()> {
-        self.git()
-            .with_ssh(&self.git_config.ssh_key_file)
-            .fetch(&[base_ref, &oid.to_string()])
+        self.git().fetch(&[base_ref, &oid.to_string()])
     }
 
     // None represents a Merge conflict
@@ -94,6 +106,7 @@ impl GitRepository {
             .current_dir(&self.directory)
             .with_user(&self.git_config.user)
             .with_email(&self.git_config.email)
+            .with_ssh(&self.git_config.ssh_key_file)
     }
 }
 
@@ -127,9 +140,14 @@ impl Git {
     }
 
     pub fn with_ssh(mut self, ssh_key_file: &Path) -> Self {
+        let path = if ssh_key_file.is_absolute() {
+            ssh_key_file.to_path_buf()
+        } else {
+            std::env::current_dir().unwrap().join(ssh_key_file)
+        };
         self.inner.env(
             "GIT_SSH_COMMAND",
-            format!("ssh -i {} -S none", ssh_key_file.display()),
+            format!("ssh -i {} -S none -o 'IdentitiesOnly true'", path.display()),
         );
         self
     }
@@ -218,7 +236,7 @@ impl Git {
         Ok(())
     }
 
-    pub fn head_oid(mut self) -> Result<Oid> {
+    pub fn head_oid(self) -> Result<Oid> {
         self.ref_to_oid("HEAD")
     }
 
@@ -226,5 +244,31 @@ impl Git {
         self.inner.args(&["rev-parse", r]);
         let output = self.run()?;
         Ok(Oid::from_str(output.trim()))
+    }
+
+    pub fn push_branch(mut self, branch: &str, force: bool) -> Result<()> {
+        self.inner.args(&["push", "origin"]);
+        if force {
+            self.inner.arg("--force-with-lease");
+        }
+        self.inner.arg(branch);
+        self.run()?;
+        Ok(())
+    }
+
+    pub fn push_to_remote(
+        mut self,
+        repo: &Repo,
+        branch: &str,
+        old_oid: &Oid,
+        new_oid: &Oid,
+    ) -> Result<()> {
+        self.inner
+            .arg("push")
+            .arg(&format!("--force-with-lease={}:{}", branch, old_oid))
+            .arg(repo.to_github_ssh_url())
+            .arg(format!("{}:{}", new_oid, branch));
+        self.run()?;
+        Ok(())
     }
 }

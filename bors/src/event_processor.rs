@@ -1,6 +1,6 @@
 use crate::{
     command::Command, config::RepoConfig, git::GitRepository, graphql::GithubClient,
-    state::PullRequestState, Config, Result,
+    queue::MergeQueue, state::PullRequestState, Config, Result,
 };
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
 use github::{Event, EventType, NodeId};
@@ -58,6 +58,7 @@ pub struct EventProcessor {
     config: Config,
     github: GithubClient,
     git_repository: GitRepository,
+    merge_queue: MergeQueue,
     pulls: HashMap<u64, PullRequestState>,
     db: Mutex<HotPot>,
     requests_rx: mpsc::Receiver<Request>,
@@ -75,6 +76,7 @@ impl EventProcessor {
                 config,
                 github,
                 git_repository,
+                merge_queue: MergeQueue::new(),
                 pulls: HashMap::new(),
                 db: Mutex::new(HotPot::new()),
                 requests_rx: rx,
@@ -142,6 +144,20 @@ impl EventProcessor {
             // Unsupported Event
             _ => {}
         }
+
+        self.process_merge_queue().await
+    }
+
+    async fn process_merge_queue(&mut self) {
+        self.merge_queue
+            .process_queue(
+                &self.config,
+                &self.github,
+                &mut self.git_repository,
+                &mut self.pulls,
+            )
+            .await
+            .unwrap()
     }
 
     fn command_context<'a>(
