@@ -96,16 +96,17 @@ pub struct PullRequestBranchUpdateResponse {
 #[derive(Debug, Default, Serialize)]
 pub struct MergePullRequest {
     /// Title for the automatic commit message
-    commit_title: String,
+    pub commit_title: String,
     /// Extra detail to append to automatic commit message
-    commit_message: Option<String>,
+    pub commit_message: String,
     /// Merge method to use. Possible values are merge, squash or rebase
-    merge_method: MergeMethod,
+    pub merge_method: MergeMethod,
     /// SHA that pull request head must match to allow merge
-    sha: String,
+    pub sha: String,
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MergeMethod {
     Merge,
     Squash,
@@ -120,9 +121,9 @@ impl Default for MergeMethod {
 
 #[derive(Debug, Default, Deserialize)]
 pub struct MergePullRequestResponse {
-    sha: String,
-    merged: bool,
-    message: String,
+    pub sha: String,
+    pub merged: bool,
+    pub message: String,
 }
 
 // A comment on part of a PullRequest review

@@ -24,7 +24,9 @@ pub use markdown::MarkdownClient;
 pub use pagination::{
     Pagination, PaginationCursorOptions, PaginationOptions, SortDirection, SortPages, StateFilter,
 };
-pub use pulls::{ListPullsOptions, PullsClient};
+pub use pulls::{
+    ListPullsOptions, MergeMethod, MergePullRequest, MergePullRequestResponse, PullsClient,
+};
 pub use rate_limit::{Rate, RateLimitClient, RateLimits};
 pub use reactions::ReactionsClient;
 pub use repos::RepositoryClient;
