@@ -20,7 +20,7 @@ pub enum Error {
     #[error("`{0}`")]
     Message(Cow<'static, str>),
 
-    #[error("`{}` `{:?}`", 0, 1)]
+    #[error("`{0}` `{1:?}`")]
     GithubClientError(reqwest::StatusCode, GithubClientError),
 
     #[error("RateLimit")]
@@ -30,7 +30,7 @@ pub enum Error {
     AbuseLimit,
 
     #[cfg(feature = "graphql")]
-    #[error("GraphqlError: {}", 0)]
+    #[error("GraphqlError: {0:?}")]
     GraphqlError(Vec<graphql_client::Error>),
 }
 
