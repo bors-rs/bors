@@ -33,10 +33,10 @@ pub struct PullRequestState {
     pub status: Status,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TestResult {
-    passed: bool,
-    details_url: String,
+    pub passed: bool,
+    pub details_url: String,
 }
 
 #[derive(Debug)]

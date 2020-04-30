@@ -45,6 +45,49 @@ impl MergeQueue {
         Self { head: None }
     }
 
+    async fn land_pr(
+        &mut self,
+        config: &Config,
+        github: &GithubClient,
+        repo: &mut GitRepository,
+        pulls: &mut HashMap<u64, PullRequestState>,
+    ) -> Result<()> {
+        let head = self
+            .head
+            .take()
+            .expect("land_pr should only be called when there is a PR to land");
+
+        let pull = pulls.remove(&head).expect("PR should exist");
+        let merge_oid = pull.merge_oid.as_ref().unwrap();
+        let head_repo = pull.head_repo.as_ref().unwrap();
+
+        assert!(pull.maintainer_can_modify);
+
+        // Before 'merging' the PR into the base ref we first update the PR with the rebased
+        // commits that are to be imminently merged using the `maintainer_can_modify` feature.
+        // This is done so that when the commits are finally pushed to the base ref that Github
+        // will properly mark the PR as being 'merged'.
+        repo.push_to_remote(
+            &head_repo,
+            &pull.head_ref_name,
+            &pull.head_ref_oid,
+            &merge_oid,
+        )?;
+
+        // Finally 'merge' the PR by updating the 'base_ref' with `merge_oid`
+        github
+            .git()
+            .update_ref(
+                config.repo().owner(),
+                config.repo().name(),
+                &format!("heads/{}", pull.base_ref_name),
+                &merge_oid,
+                false,
+            )
+            .await?;
+        Ok(())
+    }
+
     pub async fn process_queue(
         &mut self,
         config: &Config,
@@ -61,36 +104,74 @@ impl MergeQueue {
                 <= 1
         );
 
-        // Land the PR at the head of the queue
-        if let Some(head) = self.head.take() {
-            let pull = pulls.remove(&head).expect("PR should exist");
-            let merge_oid = pull.merge_oid.unwrap();
-            let head_repo = pull.head_repo.unwrap();
+        // Process the PR at the head of the queue
+        if let Some(head) = self.head {
+            let pull = pulls.get_mut(&head).expect("PR should exist");
 
-            assert!(pull.maintainer_can_modify);
+            // Check if there were any test failures from configured checks
+            if let Some((name, result)) = config
+                .repo()
+                .checks()
+                .filter_map(|name| {
+                    pull.test_results
+                        .get(name)
+                        .map(|result| (name, result.clone()))
+                })
+                .find(|(_name, result)| !result.passed)
+            {
+                // Remove the PR from the Queue
+                pull.status = Status::InReview;
+                self.head.take();
 
-            // Before 'merging' the PR into the base ref we first update the PR with the rebased
-            // commits that are to be imminently merged using the `maintainer_can_modify` feature.
-            // This is done so that when the commits are finally pushed to the base ref that Github
-            // will properly mark the PR as being 'merged'.
-            repo.push_to_remote(
-                &head_repo,
-                &pull.head_ref_name,
-                &pull.head_ref_oid,
-                &merge_oid,
-            )?;
+                // XXX Create github status/check
 
-            // Finally 'merge' the PR by updating the 'base_ref' with `merge_oid`
-            github
-                .git()
-                .update_ref(
-                    config.repo().owner(),
-                    config.repo().name(),
-                    &format!("heads/{}", pull.base_ref_name),
-                    &merge_oid,
-                    false,
-                )
-                .await?;
+                // Report the Error
+                github
+                    .issues()
+                    .create_comment(
+                        config.repo().owner(),
+                        config.repo().name(),
+                        pull.number,
+                        &format!(
+                            ":broken_heart: Test Failed - [{}]({})",
+                            name, result.details_url
+                        ),
+                    )
+                    .await?;
+            } else {
+                // Check to see if all tests have completed and passed
+                if config
+                    .repo()
+                    .checks()
+                    .map(|name| pull.test_results.get(name))
+                    .all(|maybe_result| {
+                        if let Some(result) = maybe_result {
+                            result.passed
+                        } else {
+                            false
+                        }
+                    })
+                {
+                    // Report the Success
+                    github
+                        .issues()
+                        .create_comment(
+                            config.repo().owner(),
+                            config.repo().name(),
+                            pull.number,
+                            &format!(
+                                ":sunny: Tests Passed\nApproved by: {:?}\nPushing {} to {}...",
+                                pull.approved_by,
+                                pull.merge_oid.as_ref().unwrap(),
+                                pull.base_ref_name
+                            ),
+                        )
+                        .await?;
+
+                    // XXX Create github status/check
+                    self.land_pr(config, github, repo, pulls).await?;
+                }
+            }
         }
 
         if self.head.is_none() {

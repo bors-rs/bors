@@ -73,6 +73,10 @@ impl RepoConfig {
     pub fn allow_self_review(&self) -> bool {
         self.allow_self_review
     }
+
+    pub fn checks(&self) -> impl Iterator<Item = &str> {
+        self.checks.iter().map(|(_app, check)| check.name.as_ref())
+    }
 }
 
 #[derive(Debug, Deserialize)]

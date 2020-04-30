@@ -194,7 +194,7 @@ impl EventProcessor {
     }
 
     fn handle_check_run_event(&mut self, event: &github::CheckRunEvent) {
-        info!("CheckRunEvent:\n{:#?}", event);
+        info!("Handling CheckRunEvent");
 
         // Skip the event if it hasn't completed
         let conclusion = match (
