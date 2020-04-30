@@ -314,7 +314,7 @@ impl Event {
 }
 
 /// The Action performed by a `CheckRunEvent`
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CheckRunEventAction {
     Created,

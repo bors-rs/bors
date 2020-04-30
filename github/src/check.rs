@@ -22,7 +22,7 @@ pub struct Image {
     pub caption: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Conclusion {
     Success,
@@ -33,7 +33,7 @@ pub enum Conclusion {
     ActionRequired,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CheckStatus {
     Queued,

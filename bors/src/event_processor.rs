@@ -105,6 +105,7 @@ impl EventProcessor {
         //TODO route on the request
         match &event {
             Event::PullRequest(e) => self.handle_pull_request_event(e),
+            Event::CheckRun(e) => self.handle_check_run_event(e),
             Event::IssueComment(e) => {
                 // Only process commands from newly created comments
                 if e.action.is_created() && e.issue.is_pull_request() {
@@ -190,6 +191,43 @@ impl EventProcessor {
             // Do nothing for actions we're not interested in
             _ => {}
         }
+    }
+
+    fn handle_check_run_event(&mut self, event: &github::CheckRunEvent) {
+        info!("CheckRunEvent:\n{:#?}", event);
+
+        // Skip the event if it hasn't completed
+        let conclusion = match (
+            event.action,
+            event.check_run.status,
+            event.check_run.conclusion,
+        ) {
+            (
+                github::CheckRunEventAction::Completed,
+                github::CheckStatus::Completed,
+                Some(conclusion),
+            ) => conclusion,
+            _ => return,
+        };
+
+        // Get PR from merge_oid value
+        let pr = if let Some((_n, pr)) = self.pulls.iter_mut().find(|(_n, pr)| {
+            if let Some(oid) = &pr.merge_oid {
+                *oid == event.check_run.head_sha
+            } else {
+                false
+            }
+        }) {
+            pr
+        } else {
+            return;
+        };
+
+        pr.add_build_result(
+            &event.check_run.name,
+            &event.check_run.details_url,
+            conclusion,
+        );
     }
 
     async fn process_merge_queue(&mut self) {

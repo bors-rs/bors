@@ -1,6 +1,6 @@
 use github::Oid;
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub struct PullRequestState {
@@ -29,7 +29,14 @@ pub struct PullRequestState {
     pub priority: u32,
     pub delegate: bool,
     pub merge_oid: Option<Oid>,
+    pub test_results: HashMap<String, TestResult>,
     pub status: Status,
+}
+
+#[derive(Debug)]
+pub struct TestResult {
+    passed: bool,
+    details_url: String,
 }
 
 #[derive(Debug)]
@@ -69,6 +76,7 @@ impl PullRequestState {
             priority: 0,
             delegate: false,
             merge_oid: None,
+            test_results: HashMap::new(),
             status: Status::InReview,
         }
     }
@@ -86,6 +94,21 @@ impl PullRequestState {
     // to land it should be kicked out
     pub fn update_head(&mut self, oid: Oid) {
         self.head_ref_oid = oid;
+    }
+
+    pub fn add_build_result(
+        &mut self,
+        build_name: &str,
+        details_url: &str,
+        conclusion: github::Conclusion,
+    ) {
+        self.test_results.insert(
+            build_name.to_owned(),
+            TestResult {
+                details_url: details_url.to_owned(),
+                passed: matches!(conclusion, github::Conclusion::Success),
+            },
+        );
     }
 }
 

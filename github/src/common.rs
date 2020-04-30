@@ -10,7 +10,7 @@ impl NodeId {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Oid(String);
 
 impl Oid {
