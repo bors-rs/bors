@@ -1117,6 +1117,7 @@ pub struct StatusEvent {
     pub state: StatusEventState,
     pub description: Option<String>,
     pub target_url: Option<String>,
+    pub context: String,
     // branches: ???,
     // commit: ???,
     pub repository: Repository,

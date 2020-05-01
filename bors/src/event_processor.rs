@@ -100,12 +100,17 @@ impl EventProcessor {
     }
 
     async fn handle_webhook(&mut self, event: Event, delivery_id: String) {
-        info!("Handling Webhook: {}", delivery_id);
+        info!(
+            "Handling Webhook: event = '{:?}', id = {}",
+            event.event_type(),
+            delivery_id
+        );
 
         //TODO route on the request
         match &event {
             Event::PullRequest(e) => self.handle_pull_request_event(e),
             Event::CheckRun(e) => self.handle_check_run_event(e),
+            Event::Status(e) => self.handle_status_event(e),
             Event::IssueComment(e) => {
                 // Only process commands from newly created comments
                 if e.action.is_created() && e.issue.is_pull_request() {
@@ -226,6 +231,37 @@ impl EventProcessor {
         pr.add_build_result(
             &event.check_run.name,
             &event.check_run.details_url,
+            conclusion,
+        );
+    }
+
+    // XXX This currently shoehorns github's statuses to fit into the new checks api. We should
+    // probably introduce a few types to distinguish between the two
+    fn handle_status_event(&mut self, event: &github::StatusEvent) {
+        // Skip the event if it hasn't completed
+        let conclusion = match event.state {
+            github::StatusEventState::Pending => return,
+            github::StatusEventState::Success => github::Conclusion::Success,
+            github::StatusEventState::Failure => github::Conclusion::Failure,
+            github::StatusEventState::Error => github::Conclusion::Failure,
+        };
+
+        // Get PR from merge_oid value
+        let pr = if let Some((_n, pr)) = self.pulls.iter_mut().find(|(_n, pr)| {
+            if let Some(oid) = &pr.merge_oid {
+                *oid == event.sha
+            } else {
+                false
+            }
+        }) {
+            pr
+        } else {
+            return;
+        };
+
+        pr.add_build_result(
+            &event.context,
+            &event.target_url.as_deref().unwrap_or(""),
             conclusion,
         );
     }

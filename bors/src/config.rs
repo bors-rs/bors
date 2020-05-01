@@ -55,6 +55,10 @@ pub struct RepoConfig {
     /// Set of commit checks that must have succeeded in order to merge a PR
     #[serde(default)]
     checks: HashMap<String, ChecksConfig>,
+
+    /// Set of commit statuses that must have succeeded in order to merge a PR
+    #[serde(default)]
+    status: HashMap<String, StatusConfig>,
 }
 
 impl RepoConfig {
@@ -75,11 +79,22 @@ impl RepoConfig {
     }
 
     pub fn checks(&self) -> impl Iterator<Item = &str> {
-        self.checks.iter().map(|(_app, check)| check.name.as_ref())
+        let checks = self.checks.iter().map(|(_app, check)| check.name.as_ref());
+        let status = self
+            .status
+            .iter()
+            .map(|(_app, status)| status.context.as_ref());
+
+        checks.chain(status)
     }
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ChecksConfig {
     name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StatusConfig {
+    context: String,
 }
