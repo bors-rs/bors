@@ -120,10 +120,25 @@ impl MergeQueue {
                 .find(|(_name, result)| !result.passed)
             {
                 // Remove the PR from the Queue
+                // XXX Maybe mark as "Failed"?
                 pull.status = Status::InReview;
                 self.head.take();
 
-                // XXX Create github status/check
+                // Create github status/check
+                github
+                    .repos()
+                    .create_status(
+                        config.repo().owner(),
+                        config.repo().name(),
+                        &pull.head_ref_oid.to_string(),
+                        &github::client::CreateStatusRequest {
+                            state: github::StatusEventState::Failure,
+                            target_url: Some(&result.details_url),
+                            description: None,
+                            context: "bors",
+                        },
+                    )
+                    .await?;
 
                 // Report the Error
                 github
@@ -168,7 +183,22 @@ impl MergeQueue {
                         )
                         .await?;
 
-                    // XXX Create github status/check
+                    // Create github status/check on the merge commit
+                    github
+                        .repos()
+                        .create_status(
+                            config.repo().owner(),
+                            config.repo().name(),
+                            &pull.merge_oid.as_ref().unwrap().to_string(),
+                            &github::client::CreateStatusRequest {
+                                state: github::StatusEventState::Success,
+                                target_url: None,
+                                description: None,
+                                context: "bors",
+                            },
+                        )
+                        .await?;
+
                     self.land_pr(config, github, repo, pulls).await?;
                 }
             }
@@ -198,7 +228,24 @@ impl MergeQueue {
 
                     pr.merge_oid = Some(merge_oid);
                     pr.status = Status::Testing;
+                    pr.test_results.clear();
                     self.head = Some(pr.number);
+
+                    // Create github status
+                    github
+                        .repos()
+                        .create_status(
+                            config.repo().owner(),
+                            config.repo().name(),
+                            &pr.head_ref_oid.to_string(),
+                            &github::client::CreateStatusRequest {
+                                state: github::StatusEventState::Pending,
+                                target_url: None,
+                                description: None,
+                                context: "bors",
+                            },
+                        )
+                        .await?;
                 } else {
                     unimplemented!("Merge conflict");
                 }
