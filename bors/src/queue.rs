@@ -247,7 +247,32 @@ impl MergeQueue {
                         )
                         .await?;
                 } else {
-                    unimplemented!("Merge conflict");
+                    pr.status = Status::InReview;
+
+                    github
+                        .repos()
+                        .create_status(
+                            config.repo().owner(),
+                            config.repo().name(),
+                            &pr.head_ref_oid.to_string(),
+                            &github::client::CreateStatusRequest {
+                                state: github::StatusEventState::Error,
+                                target_url: None,
+                                description: Some("Merge Conflict"),
+                                context: "bors",
+                            },
+                        )
+                        .await?;
+
+                    github
+                        .issues()
+                        .create_comment(
+                            config.repo().owner(),
+                            config.repo().name(),
+                            pr.number,
+                            ":lock: Merge Conflict",
+                        )
+                        .await?;
                 }
             }
         }
