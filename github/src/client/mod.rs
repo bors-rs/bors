@@ -31,7 +31,7 @@ pub use pulls::{
 };
 pub use rate_limit::{Rate, RateLimitClient, RateLimits};
 pub use reactions::ReactionsClient;
-pub use repos::RepositoryClient;
+pub use repos::{CombinedStatus, CreateStatusRequest, RepoStatus, RepositoryClient};
 
 // Constants
 const DEFAULT_BASE_URL: &str = "https://api.github.com/";

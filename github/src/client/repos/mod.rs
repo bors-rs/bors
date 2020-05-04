@@ -1,8 +1,10 @@
 use crate::client::Client;
 
 mod collaborators;
+mod status;
 
 pub use collaborators::ListCollaboratorsOptions;
+pub use status::{CombinedStatus, CreateStatusRequest, RepoStatus};
 
 /// `RepositoryClient` handles communication with the Repository related methods of the GitHub API.
 ///

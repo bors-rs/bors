@@ -2,7 +2,7 @@ use super::{
     CheckRun, CheckSuite, Comment, Commit, DateTime, Hook, Issue, Key, Label, Milestone, Oid,
     PullRequest, Pusher, Repository, Review, ReviewComment, Team, User,
 };
-use serde::{de, Deserialize};
+use serde::{de, Deserialize, Serialize};
 use std::str::FromStr;
 use thiserror::Error;
 
@@ -1099,7 +1099,7 @@ pub struct StarEvent {
     //pub installation: Installation, //TODO add type
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StatusEventState {
     Pending,
