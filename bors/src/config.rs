@@ -59,6 +59,9 @@ pub struct RepoConfig {
     /// Set of commit statuses that must have succeeded in order to merge a PR
     #[serde(default)]
     status: HashMap<String, StatusConfig>,
+
+    /// Timeout for tests in seconds
+    timeout_seconds: Option<u64>,
 }
 
 impl RepoConfig {
@@ -90,7 +93,9 @@ impl RepoConfig {
 
     pub fn timeout(&self) -> ::std::time::Duration {
         const DEFAULT_TIMEOUT_SECONDS: u64 = 60 * 60 * 2; // 2 hours
-        ::std::time::Duration::from_secs(DEFAULT_TIMEOUT_SECONDS)
+
+        let seconds = self.timeout_seconds.unwrap_or(DEFAULT_TIMEOUT_SECONDS);
+        ::std::time::Duration::from_secs(seconds)
     }
 }
 
