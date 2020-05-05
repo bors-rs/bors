@@ -137,11 +137,12 @@ impl MergeQueue {
 
         // Early return if the PR that was currently being tested had its state changed from
         // `Status::Testing`, e.g. if the land was canceled.
-        let (merge_oid, test_results) = match &pull.status {
+        let (merge_oid, tests_started_at, test_results) = match &pull.status {
             Status::Testing {
                 merge_oid,
+                tests_started_at,
                 test_results,
-            } => (merge_oid, test_results),
+            } => (merge_oid, tests_started_at, test_results),
             _ => {
                 self.head = None;
                 return Ok(());
@@ -228,6 +229,41 @@ impl MergeQueue {
                 .await?;
 
             self.land_pr(config, github, repo, pulls).await?;
+
+        // Check if the test has timed-out
+        } else if tests_started_at.elapsed() >= config.repo().timeout() {
+            info!("PR #{} timed-out", pull.number);
+
+            // Remove the PR from the Queue
+            // XXX Maybe mark as "Failed"?
+            pull.status = Status::InReview;
+            self.head = None;
+
+            github
+                .repos()
+                .create_status(
+                    config.repo().owner(),
+                    config.repo().name(),
+                    &pull.head_ref_oid.to_string(),
+                    &github::client::CreateStatusRequest {
+                        state: github::StatusEventState::Failure,
+                        target_url: None,
+                        description: Some("Timed-out"),
+                        context: "bors",
+                    },
+                )
+                .await?;
+
+            // Report the Error
+            github
+                .issues()
+                .create_comment(
+                    config.repo().owner(),
+                    config.repo().name(),
+                    pull.number,
+                    &format!(":boom: Tests timed-out"),
+                )
+                .await?;
         }
 
         Ok(())

@@ -41,7 +41,7 @@ pub enum Status {
     Queued,
     Testing {
         merge_oid: Oid,
-        // tests_started_at: std::time::Instant,
+        tests_started_at: std::time::Instant,
         test_results: HashMap<String, TestResult>,
     },
     // Failed {
@@ -66,7 +66,7 @@ impl Status {
     pub fn testing(merge_oid: Oid) -> Status {
         Status::Testing {
             merge_oid,
-            // tests_started_at: std::time::Instant::now(),
+            tests_started_at: std::time::Instant::now(),
             test_results: HashMap::new(),
         }
     }

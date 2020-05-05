@@ -87,6 +87,11 @@ impl RepoConfig {
 
         checks.chain(status)
     }
+
+    pub fn timeout(&self) -> ::std::time::Duration {
+        const DEFAULT_TIMEOUT_SECONDS: u64 = 60 * 60 * 2; // 2 hours
+        ::std::time::Duration::from_secs(DEFAULT_TIMEOUT_SECONDS)
+    }
 }
 
 #[derive(Debug, Deserialize)]
