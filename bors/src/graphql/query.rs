@@ -109,9 +109,6 @@ impl From<list_pulls::ListPullsRepositoryPullRequestsNodes> for crate::state::Pu
 
             approved_by: std::collections::HashSet::new(),
             priority: 0,
-            delegate: false,
-            merge_oid: None,
-            test_results: std::collections::HashMap::new(),
             status: crate::state::Status::InReview,
         }
     }

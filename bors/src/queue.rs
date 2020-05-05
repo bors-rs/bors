@@ -58,7 +58,11 @@ impl MergeQueue {
             .expect("land_pr should only be called when there is a PR to land");
 
         let pull = pulls.remove(&head).expect("PR should exist");
-        let merge_oid = pull.merge_oid.as_ref().unwrap();
+        let merge_oid = match pull.status {
+            Status::Testing { merge_oid, .. } => merge_oid,
+            // XXX Fix this
+            _ => unreachable!(),
+        };
         let head_repo = pull.head_repo.as_ref().unwrap();
 
         assert!(pull.maintainer_can_modify);
@@ -96,35 +100,174 @@ impl MergeQueue {
         pulls: &mut HashMap<u64, PullRequestState>,
     ) -> Result<()> {
         // Ensure that only ever 1 PR is in "Testing" at a time
-        assert!(
-            pulls
-                .iter()
-                .filter(|(_n, p)| matches!(p.status, Status::Testing))
-                .count()
-                <= 1
-        );
+        assert!(pulls.iter().filter(|(_n, p)| p.status.is_testing()).count() <= 1);
 
         // Process the PR at the head of the queue
-        if let Some(head) = self.head {
-            let pull = pulls.get_mut(&head).expect("PR should exist");
+        self.process_head(config, github, repo, pulls).await?;
 
-            // Check if there were any test failures from configured checks
-            if let Some((name, result)) = config
-                .repo()
-                .checks()
-                .filter_map(|name| {
-                    pull.test_results
-                        .get(name)
-                        .map(|result| (name, result.clone()))
-                })
-                .find(|(_name, result)| !result.passed)
+        if self.head.is_none() {
+            self.process_next_head(config, github, repo, pulls).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn process_head(
+        &mut self,
+        config: &Config,
+        github: &GithubClient,
+        repo: &mut GitRepository,
+        pulls: &mut HashMap<u64, PullRequestState>,
+    ) -> Result<()> {
+        // Early return if there isn't anything at the head of the Queue currently being tested
+        let head = if let Some(head) = self.head {
+            head
+        } else {
+            return Ok(());
+        };
+
+        // Early return if the PR that was currently being tested was closed for some reason
+        let pull = match pulls.get_mut(&head) {
+            Some(pull) => pull,
+            None => {
+                self.head = None;
+                return Ok(());
+            }
+        };
+
+        // Early return if the PR that was currently being tested had its state changed from
+        // `Status::Testing`, e.g. if the land was canceled.
+        let (merge_oid, test_results) = match &pull.status {
+            Status::Testing {
+                merge_oid,
+                test_results,
+            } => (merge_oid, test_results),
+            _ => {
+                self.head = None;
+                return Ok(());
+            }
+        };
+
+        // Check if there were any test failures from configured checks
+        if let Some((name, result)) = config
+            .repo()
+            .checks()
+            .filter_map(|name| test_results.get(name).map(|result| (name, result.clone())))
+            .find(|(_name, result)| !result.passed)
+        {
+            // Remove the PR from the Queue
+            // XXX Maybe mark as "Failed"?
+            pull.status = Status::InReview;
+            self.head.take();
+
+            // Create github status/check
+            github
+                .repos()
+                .create_status(
+                    config.repo().owner(),
+                    config.repo().name(),
+                    &pull.head_ref_oid.to_string(),
+                    &github::client::CreateStatusRequest {
+                        state: github::StatusEventState::Failure,
+                        target_url: Some(&result.details_url),
+                        description: None,
+                        context: "bors",
+                    },
+                )
+                .await?;
+
+            // Report the Error
+            github
+                .issues()
+                .create_comment(
+                    config.repo().owner(),
+                    config.repo().name(),
+                    pull.number,
+                    &format!(
+                        ":broken_heart: Test Failed - [{}]({})",
+                        name, result.details_url
+                    ),
+                )
+                .await?;
+
+        // Check if all tests have completed and passed
+        } else if config
+            .repo()
+            .checks()
+            .map(|name| test_results.get(name))
+            .all(|result| result.map(|r| r.passed).unwrap_or(false))
+        {
+            // Report the Success
+            github
+                .issues()
+                .create_comment(
+                    config.repo().owner(),
+                    config.repo().name(),
+                    pull.number,
+                    &format!(
+                        ":sunny: Tests Passed\nApproved by: {:?}\nPushing {} to {}...",
+                        pull.approved_by, merge_oid, pull.base_ref_name
+                    ),
+                )
+                .await?;
+
+            // Create github status/check on the merge commit
+            github
+                .repos()
+                .create_status(
+                    config.repo().owner(),
+                    config.repo().name(),
+                    &merge_oid.to_string(),
+                    &github::client::CreateStatusRequest {
+                        state: github::StatusEventState::Success,
+                        target_url: None,
+                        description: None,
+                        context: "bors",
+                    },
+                )
+                .await?;
+
+            self.land_pr(config, github, repo, pulls).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn process_next_head(
+        &mut self,
+        config: &Config,
+        github: &GithubClient,
+        repo: &mut GitRepository,
+        pulls: &mut HashMap<u64, PullRequestState>,
+    ) -> Result<()> {
+        assert!(self.head.is_none());
+
+        let mut queue: Vec<_> = pulls
+            .iter_mut()
+            .map(|(_n, p)| p)
+            .filter(|p| p.status.is_queued())
+            .collect();
+        queue.sort_unstable_by_key(|p| QueueEntry {
+            number: p.number,
+            priority: p.priority,
+        });
+        let mut queue = queue.into_iter();
+
+        while let (None, Some(pull)) = (self.head, queue.next()) {
+            info!("Creating merge for pr #{}", pull.number);
+
+            // Attempt to rebase the PR onto 'base_ref' and push to the 'auto' branch for
+            // testing
+            if let Some(merge_oid) =
+                repo.fetch_and_rebase(&pull.base_ref_name, &pull.head_ref_oid, "auto")?
             {
-                // Remove the PR from the Queue
-                // XXX Maybe mark as "Failed"?
-                pull.status = Status::InReview;
-                self.head.take();
+                repo.push_branch("auto")?;
+                info!("pushed 'auto' branch");
 
-                // Create github status/check
+                pull.status = Status::testing(merge_oid);
+                self.head = Some(pull.number);
+
+                // Create github status
                 github
                     .repos()
                     .create_status(
@@ -132,148 +275,40 @@ impl MergeQueue {
                         config.repo().name(),
                         &pull.head_ref_oid.to_string(),
                         &github::client::CreateStatusRequest {
-                            state: github::StatusEventState::Failure,
-                            target_url: Some(&result.details_url),
+                            state: github::StatusEventState::Pending,
+                            target_url: None,
                             description: None,
                             context: "bors",
                         },
                     )
                     .await?;
+            } else {
+                pull.status = Status::InReview;
 
-                // Report the Error
+                github
+                    .repos()
+                    .create_status(
+                        config.repo().owner(),
+                        config.repo().name(),
+                        &pull.head_ref_oid.to_string(),
+                        &github::client::CreateStatusRequest {
+                            state: github::StatusEventState::Error,
+                            target_url: None,
+                            description: Some("Merge Conflict"),
+                            context: "bors",
+                        },
+                    )
+                    .await?;
+
                 github
                     .issues()
                     .create_comment(
                         config.repo().owner(),
                         config.repo().name(),
                         pull.number,
-                        &format!(
-                            ":broken_heart: Test Failed - [{}]({})",
-                            name, result.details_url
-                        ),
+                        ":lock: Merge Conflict",
                     )
                     .await?;
-            } else {
-                // Check to see if all tests have completed and passed
-                if config
-                    .repo()
-                    .checks()
-                    .map(|name| pull.test_results.get(name))
-                    .all(|maybe_result| {
-                        if let Some(result) = maybe_result {
-                            result.passed
-                        } else {
-                            false
-                        }
-                    })
-                {
-                    // Report the Success
-                    github
-                        .issues()
-                        .create_comment(
-                            config.repo().owner(),
-                            config.repo().name(),
-                            pull.number,
-                            &format!(
-                                ":sunny: Tests Passed\nApproved by: {:?}\nPushing {} to {}...",
-                                pull.approved_by,
-                                pull.merge_oid.as_ref().unwrap(),
-                                pull.base_ref_name
-                            ),
-                        )
-                        .await?;
-
-                    // Create github status/check on the merge commit
-                    github
-                        .repos()
-                        .create_status(
-                            config.repo().owner(),
-                            config.repo().name(),
-                            &pull.merge_oid.as_ref().unwrap().to_string(),
-                            &github::client::CreateStatusRequest {
-                                state: github::StatusEventState::Success,
-                                target_url: None,
-                                description: None,
-                                context: "bors",
-                            },
-                        )
-                        .await?;
-
-                    self.land_pr(config, github, repo, pulls).await?;
-                }
-            }
-        }
-
-        if self.head.is_none() {
-            // Get the next ready PR to begin testing
-            let next = pulls
-                .iter_mut()
-                .map(|(_n, p)| p)
-                .filter(|p| matches!(p.status, Status::ReadyToLand))
-                .min_by_key(|p| QueueEntry {
-                    number: p.number,
-                    priority: p.priority,
-                });
-
-            if let Some(pr) = next {
-                info!("Creating merge for pr #{}", pr.number);
-
-                // Attempt to rebase the PR onto 'base_ref' and push to the 'auto' branch for
-                // testing
-                if let Some(merge_oid) =
-                    repo.fetch_and_rebase(&pr.base_ref_name, &pr.head_ref_oid, "auto")?
-                {
-                    repo.push_branch("auto")?;
-                    info!("pushed 'auto' branch");
-
-                    pr.merge_oid = Some(merge_oid);
-                    pr.status = Status::Testing;
-                    pr.test_results.clear();
-                    self.head = Some(pr.number);
-
-                    // Create github status
-                    github
-                        .repos()
-                        .create_status(
-                            config.repo().owner(),
-                            config.repo().name(),
-                            &pr.head_ref_oid.to_string(),
-                            &github::client::CreateStatusRequest {
-                                state: github::StatusEventState::Pending,
-                                target_url: None,
-                                description: None,
-                                context: "bors",
-                            },
-                        )
-                        .await?;
-                } else {
-                    pr.status = Status::InReview;
-
-                    github
-                        .repos()
-                        .create_status(
-                            config.repo().owner(),
-                            config.repo().name(),
-                            &pr.head_ref_oid.to_string(),
-                            &github::client::CreateStatusRequest {
-                                state: github::StatusEventState::Error,
-                                target_url: None,
-                                description: Some("Merge Conflict"),
-                                context: "bors",
-                            },
-                        )
-                        .await?;
-
-                    github
-                        .issues()
-                        .create_comment(
-                            config.repo().owner(),
-                            config.repo().name(),
-                            pr.number,
-                            ":lock: Merge Conflict",
-                        )
-                        .await?;
-                }
             }
         }
 

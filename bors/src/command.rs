@@ -303,13 +303,13 @@ impl Command {
                         ctx.sender(),
                     )
                 } else {
-                    ctx.pr_mut().status = Status::ReadyToLand;
+                    ctx.pr_mut().status = Status::Queued;
                     info!("pr #{} queued for landing", ctx.pr().number);
 
                     ":mailbox_with_mail: queued for landing".to_string()
                 }
             }
-            Status::ReadyToLand | Status::Testing => {
+            Status::Queued | Status::Testing { .. } => {
                 info!("pr #{} already queued for landing", ctx.pr().number);
 
                 format!(

@@ -25,11 +25,7 @@ pub struct PullRequestState {
     pub mergeable: bool,
     pub labels: Vec<String>,
 
-    //tests_started_at: Instant,
     pub priority: u32,
-    pub delegate: bool,
-    pub merge_oid: Option<Oid>,
-    pub test_results: HashMap<String, TestResult>,
     pub status: Status,
 }
 
@@ -42,10 +38,38 @@ pub struct TestResult {
 #[derive(Debug)]
 pub enum Status {
     InReview,
-    /// Queued for landing
-    ReadyToLand,
-    Testing,
-    // TODO add a Success state
+    Queued,
+    Testing {
+        merge_oid: Oid,
+        // tests_started_at: std::time::Instant,
+        test_results: HashMap<String, TestResult>,
+    },
+    // Failed {
+    //     merge_oid: Oid,
+    //     test_results: HashMap<String, TestResult>,
+    // },
+    // Success {
+    //     merge_oid: Oid,
+    //     test_results: HashMap<String, TestResult>,
+    // },
+}
+
+impl Status {
+    pub fn is_queued(&self) -> bool {
+        matches!(self, Status::Queued)
+    }
+
+    pub fn is_testing(&self) -> bool {
+        matches!(self, Status::Testing { .. })
+    }
+
+    pub fn testing(merge_oid: Oid) -> Status {
+        Status::Testing {
+            merge_oid,
+            // tests_started_at: std::time::Instant::now(),
+            test_results: HashMap::new(),
+        }
+    }
 }
 
 impl PullRequestState {
@@ -74,9 +98,6 @@ impl PullRequestState {
             mergeable: pull.mergeable.unwrap_or(false),
             labels,
             priority: 0,
-            delegate: false,
-            merge_oid: None,
-            test_results: HashMap::new(),
             status: Status::InReview,
         }
     }
@@ -102,13 +123,21 @@ impl PullRequestState {
         details_url: &str,
         conclusion: github::Conclusion,
     ) {
-        self.test_results.insert(
-            build_name.to_owned(),
-            TestResult {
-                details_url: details_url.to_owned(),
-                passed: matches!(conclusion, github::Conclusion::Success),
-            },
-        );
+        match self.status {
+            Status::Testing {
+                ref mut test_results,
+                ..
+            } => {
+                test_results.insert(
+                    build_name.to_owned(),
+                    TestResult {
+                        details_url: details_url.to_owned(),
+                        passed: matches!(conclusion, github::Conclusion::Success),
+                    },
+                );
+            }
+            _ => {}
+        }
     }
 }
 

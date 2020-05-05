@@ -198,6 +198,18 @@ impl EventProcessor {
         }
     }
 
+    fn pull_from_merge_oid(&mut self, oid: &github::Oid) -> Option<&mut PullRequestState> {
+        use crate::state::Status;
+
+        self.pulls
+            .iter_mut()
+            .find(|(_n, pr)| match &pr.status {
+                Status::Testing { merge_oid, .. } => merge_oid == oid,
+                Status::InReview | Status::Queued => false,
+            })
+            .map(|(_n, pr)| pr)
+    }
+
     fn handle_check_run_event(&mut self, event: &github::CheckRunEvent) {
         info!("Handling CheckRunEvent");
 
@@ -215,24 +227,13 @@ impl EventProcessor {
             _ => return,
         };
 
-        // Get PR from merge_oid value
-        let pr = if let Some((_n, pr)) = self.pulls.iter_mut().find(|(_n, pr)| {
-            if let Some(oid) = &pr.merge_oid {
-                *oid == event.check_run.head_sha
-            } else {
-                false
-            }
-        }) {
-            pr
-        } else {
-            return;
-        };
-
-        pr.add_build_result(
-            &event.check_run.name,
-            &event.check_run.details_url,
-            conclusion,
-        );
+        if let Some(pr) = self.pull_from_merge_oid(&event.check_run.head_sha) {
+            pr.add_build_result(
+                &event.check_run.name,
+                &event.check_run.details_url,
+                conclusion,
+            );
+        }
     }
 
     // XXX This currently shoehorns github's statuses to fit into the new checks api. We should
@@ -246,24 +247,13 @@ impl EventProcessor {
             github::StatusEventState::Error => github::Conclusion::Failure,
         };
 
-        // Get PR from merge_oid value
-        let pr = if let Some((_n, pr)) = self.pulls.iter_mut().find(|(_n, pr)| {
-            if let Some(oid) = &pr.merge_oid {
-                *oid == event.sha
-            } else {
-                false
-            }
-        }) {
-            pr
-        } else {
-            return;
-        };
-
-        pr.add_build_result(
-            &event.context,
-            &event.target_url.as_deref().unwrap_or(""),
-            conclusion,
-        );
+        if let Some(pr) = self.pull_from_merge_oid(&event.sha) {
+            pr.add_build_result(
+                &event.context,
+                &event.target_url.as_deref().unwrap_or(""),
+                conclusion,
+            );
+        }
     }
 
     async fn process_merge_queue(&mut self) {
