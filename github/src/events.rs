@@ -1,6 +1,7 @@
 use super::{
     CheckRun, CheckSuite, Comment, Commit, DateTime, Hook, Issue, Key, Label, Milestone, Oid,
-    PullRequest, Pusher, Repository, Review, ReviewComment, Team, User,
+    Project, ProjectCard, ProjectColumn, PullRequest, Pusher, Repository, Review, ReviewComment,
+    Team, User,
 };
 use serde::{de, Deserialize, Serialize};
 use std::str::FromStr;
@@ -770,7 +771,7 @@ pub struct ProjectCardEvent {
     /// The action performed on the project card. Can be created, edited, moved, converted, or deleted
     pub action: String,
     //pub changes: ProjectChange //TODO add type
-    //pub project_card: ProjectCard //TODO add type
+    pub project_card: ProjectCard,
     /// The id of the card that this card now follows if the action was "moved".
     /// Will be None if it is the first card in a column.
     pub after_id: Option<u64>,
@@ -788,7 +789,7 @@ pub struct ProjectColumnEvent {
     /// The action that was performed on the project column. Can be one of created, edited, moved or deleted
     pub action: String,
     //pub changes: ProjectCardChange //TODO add type
-    //pub project_column: ProjectColumn //TODO add type
+    pub project_column: ProjectColumn,
     /// The id of the column that this column now follows if the action was "moved".
     /// Will be None if it is the first column in a project.
     pub after_id: Option<u64>,
@@ -806,7 +807,7 @@ pub struct ProjectEvent {
     /// The action that was performed on the project. Can be one of created, edited, closed, reopened, or deleted
     pub action: String,
     //pub changes: ProjectChanges, //TODO add type
-    //pub project: Project, //TODO add type
+    pub project: Project,
 
     // Populated by Webhook events
     pub repository: Repository,
