@@ -41,6 +41,20 @@ pub struct ProjectCard {
     pub previous_column_name: Option<String>,
 }
 
+impl ProjectCard {
+    pub fn column_id(&self) -> Option<u64> {
+        self.column_url.split('/').last()?.parse().ok()
+    }
+
+    pub fn issue_number(&self) -> Option<u64> {
+        if self.note.is_some() {
+            return None;
+        }
+
+        self.content_url.split('/').last()?.parse().ok()
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct ProjectColumn {
     pub id: u64,
