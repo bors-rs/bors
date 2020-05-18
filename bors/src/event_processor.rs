@@ -1,6 +1,6 @@
 use crate::{
     command::Command, config::RepoConfig, git::GitRepository, graphql::GithubClient,
-    queue::MergeQueue, state::PullRequestState, Config, Result,
+    project_board::ProjectBoard, queue::MergeQueue, state::PullRequestState, Config, Result,
 };
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
 use github::{Event, EventType, NodeId};
@@ -59,6 +59,7 @@ pub struct EventProcessor {
     github: GithubClient,
     git_repository: GitRepository,
     merge_queue: MergeQueue,
+    project_board: Option<ProjectBoard>,
     pulls: HashMap<u64, PullRequestState>,
     db: Mutex<HotPot>,
     requests_rx: mpsc::Receiver<Request>,
@@ -77,6 +78,7 @@ impl EventProcessor {
                 github,
                 git_repository,
                 merge_queue: MergeQueue::new(),
+                project_board: None,
                 pulls: HashMap::new(),
                 db: Mutex::new(HotPot::new()),
                 requests_rx: rx,
@@ -356,6 +358,17 @@ impl EventProcessor {
         self.pulls.clear();
         self.pulls
             .extend(pulls.into_iter().map(|pr| (pr.number, pr)));
+
+        // Sync and reset project board
+        let board = crate::project_board::ProjectBoard::synchronize_or_init(
+            &self.github,
+            &self.config,
+            &mut self.pulls,
+        )
+        .await
+        .unwrap();
+
+        self.project_board = Some(board);
 
         info!("Done Synchronizing");
     }

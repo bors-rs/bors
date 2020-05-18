@@ -28,6 +28,7 @@ pub struct PullRequestState {
 
     pub priority: u32,
     pub status: Status,
+    pub project_card_id: Option<u64>,
 }
 
 #[derive(Clone, Debug)]
@@ -101,6 +102,7 @@ impl PullRequestState {
             labels,
             priority: 0,
             status: Status::InReview,
+            project_card_id: None,
         }
     }
 
