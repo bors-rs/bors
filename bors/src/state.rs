@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 #[derive(Debug)]
 pub struct PullRequestState {
     pub number: u64,
+    pub id: u64,
     pub author: Option<String>,
     pub title: String,
     pub body: String,
@@ -83,6 +84,7 @@ impl PullRequestState {
 
         Self {
             number: pull.number,
+            id: pull.id,
             author: Some(pull.user.login.clone()),
             title: pull.title.clone(),
             body: pull.body.clone().unwrap_or_default(),

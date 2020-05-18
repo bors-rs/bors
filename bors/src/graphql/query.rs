@@ -53,6 +53,7 @@ impl From<list_pulls::ListPullsRepositoryPullRequestsNodes> for crate::state::Pu
     fn from(pull: list_pulls::ListPullsRepositoryPullRequestsNodes) -> Self {
         let list_pulls::ListPullsRepositoryPullRequestsNodes {
             number,
+            database_id,
             author,
             is_draft,
             maintainer_can_modify,
@@ -66,6 +67,7 @@ impl From<list_pulls::ListPullsRepositoryPullRequestsNodes> for crate::state::Pu
             title,
             state,
             head_repository,
+            ..
         } = pull;
 
         let labels = labels
@@ -90,6 +92,7 @@ impl From<list_pulls::ListPullsRepositoryPullRequestsNodes> for crate::state::Pu
 
         Self {
             number: number as u64,
+            id: database_id.unwrap() as u64, // XXX ensure this is always populated
             author: author.map(|a| a.login),
             title,
             body,

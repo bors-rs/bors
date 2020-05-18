@@ -3,6 +3,8 @@ query ListPulls($owner: String!, $name: String!, $cursor: String) {
       pullRequests(states: OPEN, first: 25, after: $cursor) {
         nodes {
           number
+          id
+          databaseId
           author {
             login
             __typename
