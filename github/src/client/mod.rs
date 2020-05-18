@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use log::debug;
 use reqwest::{header, Client as ReqwestClient, Method, RequestBuilder};
 
 mod error;
@@ -10,6 +11,7 @@ mod issues;
 mod license;
 mod markdown;
 mod pagination;
+mod project;
 mod pulls;
 mod rate_limit;
 mod reactions;
@@ -21,10 +23,13 @@ pub use git::GitClient;
 pub use graphql::GraphqlClient;
 pub use issues::IssuesClient;
 pub use license::LicenseClient;
-use log::debug;
 pub use markdown::MarkdownClient;
 pub use pagination::{
     Pagination, PaginationCursorOptions, PaginationOptions, SortDirection, SortPages, StateFilter,
+};
+pub use project::{
+    CreateProjectCardRequest, ListProjectCardsOptions, ListProjectsOptions, MoveProjectCardRequest,
+    ProjectClient, UpdateProjectRequest,
 };
 pub use pulls::{
     ListPullsOptions, MergeMethod, MergePullRequest, MergePullRequestResponse, PullsClient,
@@ -437,8 +442,11 @@ impl Client {
     // TODO orgs endpoint
     // https://developer.github.com/v3/orgs/
 
-    // TODO projects endpoint
+    // projects endpoint
     // https://developer.github.com/v3/projects/
+    pub fn projects(&self) -> ProjectClient {
+        ProjectClient::new(&self)
+    }
 
     pub fn pulls(&self) -> PullsClient {
         PullsClient::new(&self)
