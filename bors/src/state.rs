@@ -1,3 +1,4 @@
+use crate::{graphql::GithubClient, project_board::ProjectBoard, Result};
 use github::Oid;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -119,6 +120,25 @@ impl PullRequestState {
     // to land it should be kicked out
     pub fn update_head(&mut self, oid: Oid) {
         self.head_ref_oid = oid;
+    }
+
+    pub async fn update_status(
+        &mut self,
+        status: Status,
+        github: &GithubClient,
+        project_board: Option<&ProjectBoard>,
+    ) -> Result<()> {
+        self.status = status;
+
+        if let Some(board) = project_board {
+            match &self.status {
+                Status::InReview => board.move_to_review(github, &self).await?,
+                Status::Queued => board.move_to_queued(github, &self).await?,
+                Status::Testing { .. } => board.move_to_testing(github, &self).await?,
+            }
+        }
+
+        Ok(())
     }
 
     pub fn add_build_result(

@@ -16,6 +16,77 @@ pub struct ProjectBoard {
 }
 
 impl ProjectBoard {
+    pub async fn move_to_review(
+        &self,
+        github: &GithubClient,
+        pull: &PullRequestState,
+    ) -> Result<()> {
+        if let Some(card_id) = pull.project_card_id {
+            Self::move_card_to_column(github, card_id, self.review_column.id).await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn move_to_queued(
+        &self,
+        github: &GithubClient,
+        pull: &PullRequestState,
+    ) -> Result<()> {
+        if let Some(card_id) = pull.project_card_id {
+            Self::move_card_to_column(github, card_id, self.queued_column.id).await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn move_to_testing(
+        &self,
+        github: &GithubClient,
+        pull: &PullRequestState,
+    ) -> Result<()> {
+        if let Some(card_id) = pull.project_card_id {
+            Self::move_card_to_column(github, card_id, self.testing_column.id).await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn create_card(
+        &self,
+        github: &GithubClient,
+        pull: &mut PullRequestState,
+    ) -> Result<()> {
+        assert!(pull.project_card_id.is_none());
+
+        let request = github::client::CreateProjectCardRequest {
+            note: None,
+            content_id: Some(pull.id),
+            content_type: Some("PullRequest".into()),
+        };
+        let card = github
+            .projects()
+            .create_card(self.review_column.id, &request)
+            .await?
+            .into_inner();
+
+        pull.project_card_id = Some(card.id);
+
+        Ok(())
+    }
+
+    pub async fn delete_card(
+        &self,
+        github: &GithubClient,
+        pull: &mut PullRequestState,
+    ) -> Result<()> {
+        if let Some(card_id) = pull.project_card_id.take() {
+            github.projects().delete_card(card_id).await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn synchronize_or_init(
         github: &GithubClient,
         config: &Config,
@@ -194,11 +265,7 @@ impl ProjectBoard {
                 Some(pull) => {
                     pull.project_card_id = Some(card.id);
                     if let Some(dst_column) = dst_column {
-                        let request = github::client::MoveProjectCardRequest {
-                            position: "bottom".into(),
-                            column_id: Some(dst_column),
-                        };
-                        github.projects().move_card(card.id, &request).await?;
+                        Self::move_card_to_column(github, card.id, dst_column).await?;
                     }
                 }
                 None => {
@@ -206,6 +273,19 @@ impl ProjectBoard {
                 }
             }
         }
+        Ok(())
+    }
+
+    async fn move_card_to_column(
+        github: &GithubClient,
+        card_id: u64,
+        column_id: u64,
+    ) -> Result<()> {
+        let request = github::client::MoveProjectCardRequest {
+            position: "bottom".into(),
+            column_id: Some(column_id),
+        };
+        github.projects().move_card(card_id, &request).await?;
         Ok(())
     }
 }

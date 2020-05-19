@@ -215,7 +215,7 @@ impl Command {
                 }
                 unimplemented!();
             }
-            CommandType::Cancel => Self::cancel_land(ctx),
+            CommandType::Cancel => Self::cancel_land(ctx).await?,
             CommandType::Help => ctx.create_pr_comment(&Help.to_string()).await?,
             CommandType::Priority(p) => Self::set_priority(&mut ctx, p.priority()),
         }
@@ -303,7 +303,7 @@ impl Command {
                         ctx.sender(),
                     )
                 } else {
-                    ctx.pr_mut().status = Status::Queued;
+                    ctx.update_pr_status(Status::Queued).await?;
                     info!("pr #{} queued for landing", ctx.pr().number);
 
                     ":mailbox_with_mail: queued for landing".to_string()
@@ -324,12 +324,12 @@ impl Command {
         Ok(())
     }
 
-    fn cancel_land(ctx: &mut CommandContext<'_>) {
+    async fn cancel_land(ctx: &mut CommandContext<'_>) -> Result<()> {
         use crate::state::Status;
 
         info!("Canceling land of pr #{}", ctx.pr().number);
 
-        ctx.pr_mut().status = Status::InReview;
+        ctx.update_pr_status(Status::InReview).await
     }
 }
 

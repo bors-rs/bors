@@ -1,6 +1,7 @@
 use crate::{
     git::GitRepository,
     graphql::GithubClient,
+    project_board::ProjectBoard,
     state::{PullRequestState, Status},
     Config, Result,
 };
@@ -50,6 +51,7 @@ impl MergeQueue {
         config: &Config,
         github: &GithubClient,
         repo: &mut GitRepository,
+        project_board: Option<&ProjectBoard>,
         pulls: &mut HashMap<u64, PullRequestState>,
     ) -> Result<()> {
         let head = self
@@ -57,8 +59,8 @@ impl MergeQueue {
             .take()
             .expect("land_pr should only be called when there is a PR to land");
 
-        let pull = pulls.remove(&head).expect("PR should exist");
-        let merge_oid = match pull.status {
+        let mut pull = pulls.remove(&head).expect("PR should exist");
+        let merge_oid = match &pull.status {
             Status::Testing { merge_oid, .. } => merge_oid,
             // XXX Fix this
             _ => unreachable!(),
@@ -89,6 +91,11 @@ impl MergeQueue {
                 false,
             )
             .await?;
+
+        if let Some(board) = project_board {
+            board.delete_card(github, &mut pull).await?;
+        }
+
         Ok(())
     }
 
@@ -97,16 +104,19 @@ impl MergeQueue {
         config: &Config,
         github: &GithubClient,
         repo: &mut GitRepository,
+        project_board: Option<&ProjectBoard>,
         pulls: &mut HashMap<u64, PullRequestState>,
     ) -> Result<()> {
         // Ensure that only ever 1 PR is in "Testing" at a time
         assert!(pulls.iter().filter(|(_n, p)| p.status.is_testing()).count() <= 1);
 
         // Process the PR at the head of the queue
-        self.process_head(config, github, repo, pulls).await?;
+        self.process_head(config, github, repo, project_board, pulls)
+            .await?;
 
         if self.head.is_none() {
-            self.process_next_head(config, github, repo, pulls).await?;
+            self.process_next_head(config, github, repo, project_board, pulls)
+                .await?;
         }
 
         Ok(())
@@ -117,6 +127,7 @@ impl MergeQueue {
         config: &Config,
         github: &GithubClient,
         repo: &mut GitRepository,
+        project_board: Option<&ProjectBoard>,
         pulls: &mut HashMap<u64, PullRequestState>,
     ) -> Result<()> {
         // Early return if there isn't anything at the head of the Queue currently being tested
@@ -158,7 +169,8 @@ impl MergeQueue {
         {
             // Remove the PR from the Queue
             // XXX Maybe mark as "Failed"?
-            pull.status = Status::InReview;
+            pull.update_status(Status::InReview, github, project_board)
+                .await?;
             self.head.take();
 
             // Create github status/check
@@ -228,7 +240,8 @@ impl MergeQueue {
                 )
                 .await?;
 
-            self.land_pr(config, github, repo, pulls).await?;
+            self.land_pr(config, github, repo, project_board, pulls)
+                .await?;
 
         // Check if the test has timed-out
         } else if tests_started_at.elapsed() >= config.repo().timeout() {
@@ -236,7 +249,8 @@ impl MergeQueue {
 
             // Remove the PR from the Queue
             // XXX Maybe mark as "Failed"?
-            pull.status = Status::InReview;
+            pull.update_status(Status::InReview, github, project_board)
+                .await?;
             self.head = None;
 
             github
@@ -274,6 +288,7 @@ impl MergeQueue {
         config: &Config,
         github: &GithubClient,
         repo: &mut GitRepository,
+        project_board: Option<&ProjectBoard>,
         pulls: &mut HashMap<u64, PullRequestState>,
     ) -> Result<()> {
         assert!(self.head.is_none());
@@ -300,7 +315,8 @@ impl MergeQueue {
                 repo.push_branch("auto")?;
                 info!("pushed 'auto' branch");
 
-                pull.status = Status::testing(merge_oid);
+                pull.update_status(Status::testing(merge_oid), github, project_board)
+                    .await?;
                 self.head = Some(pull.number);
 
                 // Create github status
@@ -319,7 +335,8 @@ impl MergeQueue {
                     )
                     .await?;
             } else {
-                pull.status = Status::InReview;
+                pull.update_status(Status::InReview, github, project_board)
+                    .await?;
 
                 github
                     .repos()

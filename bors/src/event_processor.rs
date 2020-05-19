@@ -1,6 +1,12 @@
 use crate::{
-    command::Command, config::RepoConfig, git::GitRepository, graphql::GithubClient,
-    project_board::ProjectBoard, queue::MergeQueue, state::PullRequestState, Config, Result,
+    command::Command,
+    config::RepoConfig,
+    git::GitRepository,
+    graphql::GithubClient,
+    project_board::ProjectBoard,
+    queue::MergeQueue,
+    state::{PullRequestState, Status},
+    Config, Result,
 };
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
 use github::{Event, EventType, NodeId};
@@ -110,7 +116,7 @@ impl EventProcessor {
 
         //TODO route on the request
         match &event {
-            Event::PullRequest(e) => self.handle_pull_request_event(e),
+            Event::PullRequest(e) => self.handle_pull_request_event(e).await,
             Event::CheckRun(e) => self.handle_check_run_event(e),
             Event::Status(e) => self.handle_status_event(e),
             Event::IssueComment(e) => {
@@ -156,7 +162,7 @@ impl EventProcessor {
         self.process_merge_queue().await
     }
 
-    fn handle_pull_request_event(&mut self, event: &github::PullRequestEvent) {
+    async fn handle_pull_request_event(&mut self, event: &github::PullRequestEvent) {
         use github::PullRequestEventAction;
 
         info!(
@@ -171,9 +177,13 @@ impl EventProcessor {
                 }
             }
             PullRequestEventAction::Opened | PullRequestEventAction::Reopened => {
-                let state = PullRequestState::from_pull_request(&event.pull_request);
+                let mut state = PullRequestState::from_pull_request(&event.pull_request);
 
                 info!("PR #{} Opened", state.number);
+
+                if let Some(board) = &self.project_board {
+                    board.create_card(&self.github, &mut state).await.unwrap();
+                }
 
                 if self.pulls.insert(state.number, state).is_some() {
                     warn!("Opened/Reopened event replaced an existing PullRequestState");
@@ -192,7 +202,15 @@ impl EventProcessor {
 
                 // XXX Do we need to call into the MergeQueue to notify it that a PR was merged or
                 // closed?
-                self.pulls.remove(&event.pull_request.number);
+                match (
+                    &mut self.pulls.remove(&event.pull_request.number),
+                    &self.project_board,
+                ) {
+                    (Some(pull), Some(board)) => {
+                        board.delete_card(&self.github, pull).await.unwrap()
+                    }
+                    _ => {}
+                }
             }
 
             // Do nothing for actions we're not interested in
@@ -201,8 +219,6 @@ impl EventProcessor {
     }
 
     fn pull_from_merge_oid(&mut self, oid: &github::Oid) -> Option<&mut PullRequestState> {
-        use crate::state::Status;
-
         self.pulls
             .iter_mut()
             .find(|(_n, pr)| match &pr.status {
@@ -264,6 +280,7 @@ impl EventProcessor {
                 &self.config,
                 &self.github,
                 &mut self.git_repository,
+                self.project_board.as_ref(),
                 &mut self.pulls,
             )
             .await
@@ -280,6 +297,7 @@ impl EventProcessor {
                 pull_request: pr,
                 github: &self.github,
                 config: self.config.repo(),
+                project_board: self.project_board.as_ref(),
                 sender,
             })
         } else {
@@ -378,6 +396,7 @@ pub struct CommandContext<'a> {
     pull_request: &'a mut PullRequestState,
     github: &'a GithubClient,
     config: &'a RepoConfig,
+    project_board: Option<&'a ProjectBoard>,
     sender: &'a str,
 }
 
@@ -420,6 +439,14 @@ impl<'a> CommandContext<'a> {
                 body,
             )
             .await?;
+        Ok(())
+    }
+
+    pub async fn update_pr_status(&mut self, status: Status) -> Result<()> {
+        self.pull_request
+            .update_status(status, self.github, self.project_board)
+            .await?;
+
         Ok(())
     }
 }
