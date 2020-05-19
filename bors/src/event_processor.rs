@@ -11,7 +11,7 @@ use crate::{
 use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
 use github::{Event, EventType, NodeId};
 use hotpot_db::HotPot;
-use log::{info, warn};
+use log::{error, info, warn};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -93,21 +93,27 @@ impl EventProcessor {
     }
 
     pub async fn start(mut self) {
-        self.synchronize().await;
+        self.synchronize()
+            .await
+            .expect("unable to synchronize initial state");
 
         while let Some(request) = self.requests_rx.next().await {
-            self.handle_request(request).await
+            if let Err(e) = self.handle_request(request).await {
+                error!("Error while handling request: {:?}", e);
+            }
         }
     }
 
-    async fn handle_request(&mut self, request: Request) {
+    async fn handle_request(&mut self, request: Request) -> Result<()> {
         use Request::*;
         match request {
-            Webhook { event, delivery_id } => self.handle_webhook(event, delivery_id).await,
+            Webhook { event, delivery_id } => self.handle_webhook(event, delivery_id).await?,
         }
+
+        Ok(())
     }
 
-    async fn handle_webhook(&mut self, event: Event, delivery_id: String) {
+    async fn handle_webhook(&mut self, event: Event, delivery_id: String) -> Result<()> {
         info!(
             "Handling Webhook: event = '{:?}', id = {}",
             event.event_type(),
@@ -116,7 +122,7 @@ impl EventProcessor {
 
         //TODO route on the request
         match &event {
-            Event::PullRequest(e) => self.handle_pull_request_event(e).await,
+            Event::PullRequest(e) => self.handle_pull_request_event(e).await?,
             Event::CheckRun(e) => self.handle_check_run_event(e),
             Event::Status(e) => self.handle_status_event(e),
             Event::IssueComment(e) => {
@@ -128,20 +134,20 @@ impl EventProcessor {
                         e.comment.body(),
                         &e.comment.node_id,
                     )
-                    .await
+                    .await?
                 }
             }
             Event::PullRequestReview(e) => {
                 if e.action.is_submitted() {
                     self.process_review(&e.sender.login, e.pull_request.number, &e.review)
-                        .await;
+                        .await?;
                     self.process_comment(
                         &e.sender.login,
                         e.pull_request.number,
                         e.review.body(),
                         &e.review.node_id,
                     )
-                    .await
+                    .await?
                 }
             }
             Event::PullRequestReviewComment(e) => {
@@ -152,17 +158,19 @@ impl EventProcessor {
                         e.comment.body(),
                         &e.comment.node_id,
                     )
-                    .await
+                    .await?
                 }
             }
             // Unsupported Event
             _ => {}
         }
 
-        self.process_merge_queue().await
+        self.process_merge_queue().await?;
+
+        Ok(())
     }
 
-    async fn handle_pull_request_event(&mut self, event: &github::PullRequestEvent) {
+    async fn handle_pull_request_event(&mut self, event: &github::PullRequestEvent) -> Result<()> {
         use github::PullRequestEventAction;
 
         info!(
@@ -182,7 +190,7 @@ impl EventProcessor {
                 info!("PR #{} Opened", state.number);
 
                 if let Some(board) = &self.project_board {
-                    board.create_card(&self.github, &mut state).await.unwrap();
+                    board.create_card(&self.github, &mut state).await?;
                 }
 
                 if self.pulls.insert(state.number, state).is_some() {
@@ -207,7 +215,7 @@ impl EventProcessor {
                     &self.project_board,
                 ) {
                     (Some(pull), Some(board)) => {
-                        board.delete_card(&self.github, pull).await.unwrap()
+                        board.delete_card(&self.github, pull).await?;
                     }
                     _ => {}
                 }
@@ -216,6 +224,8 @@ impl EventProcessor {
             // Do nothing for actions we're not interested in
             _ => {}
         }
+
+        Ok(())
     }
 
     fn pull_from_merge_oid(&mut self, oid: &github::Oid) -> Option<&mut PullRequestState> {
@@ -274,7 +284,7 @@ impl EventProcessor {
         }
     }
 
-    async fn process_merge_queue(&mut self) {
+    async fn process_merge_queue(&mut self) -> Result<()> {
         self.merge_queue
             .process_queue(
                 &self.config,
@@ -284,7 +294,6 @@ impl EventProcessor {
                 &mut self.pulls,
             )
             .await
-            .unwrap()
     }
 
     fn command_context<'a>(
@@ -311,7 +320,7 @@ impl EventProcessor {
         pr_number: u64,
         comment: Option<&str>,
         node_id: &NodeId,
-    ) {
+    ) -> Result<()> {
         info!("comment: {:#?}", comment);
 
         match comment.and_then(Command::from_comment) {
@@ -320,14 +329,12 @@ impl EventProcessor {
 
                 self.github
                     .add_reaction(node_id, github::ReactionType::Rocket)
-                    .await
-                    // TODO handle or ignore error
-                    .unwrap();
+                    .await?;
 
                 let mut ctx = self.command_context(user, pr_number).unwrap();
                 // Check if the user is authorized before executing the command
-                if command.is_authorized(&ctx).await.unwrap() {
-                    command.execute(&mut ctx).await.unwrap();
+                if command.is_authorized(&ctx).await? {
+                    command.execute(&mut ctx).await?;
                 }
             }
             Some(Err(_)) => {
@@ -340,35 +347,40 @@ impl EventProcessor {
                         pr_number,
                         &format!(":exclamation: Invalid command\n\n{}", Command::help()),
                     )
-                    .await
-                    // TODO handle or ignore error
-                    .unwrap();
+                    .await?;
             }
             None => {
                 info!("No command in comment");
             }
         }
+
+        Ok(())
     }
 
-    async fn process_review(&mut self, sender: &str, pr_number: u64, review: &github::Review) {
+    async fn process_review(
+        &mut self,
+        sender: &str,
+        pr_number: u64,
+        review: &github::Review,
+    ) -> Result<()> {
         if let Some(command) = Command::from_review(review) {
             let mut ctx = self.command_context(sender, pr_number).unwrap();
             // Check if the user is authorized before executing the command
-            if command.is_authorized(&ctx).await.unwrap() {
-                command.execute(&mut ctx).await.unwrap();
+            if command.is_authorized(&ctx).await? {
+                command.execute(&mut ctx).await?;
             }
         }
+
+        Ok(())
     }
 
-    async fn synchronize(&mut self) {
+    async fn synchronize(&mut self) -> Result<()> {
         info!("Synchronizing");
 
-        // TODO: Handle error
         let pulls = self
             .github
             .open_pulls(self.config.repo().owner(), self.config.repo().name())
-            .await
-            .unwrap();
+            .await?;
         info!("{} Open PullRequests", pulls.len());
 
         // TODO: Scrape the comments/Reviews of each PR to pull out reviewer/approval data
@@ -383,12 +395,12 @@ impl EventProcessor {
             &self.config,
             &mut self.pulls,
         )
-        .await
-        .unwrap();
+        .await?;
 
         self.project_board = Some(board);
 
         info!("Done Synchronizing");
+        Ok(())
     }
 }
 
