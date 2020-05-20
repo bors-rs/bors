@@ -95,6 +95,7 @@ impl MergeQueue {
         if let Some(board) = project_board {
             board.delete_card(github, &mut pull).await?;
         }
+        pull.remove_labels(config.repo(), github).await?;
 
         Ok(())
     }
@@ -169,7 +170,7 @@ impl MergeQueue {
         {
             // Remove the PR from the Queue
             // XXX Maybe mark as "Failed"?
-            pull.update_status(Status::InReview, github, project_board)
+            pull.update_status(Status::InReview, config.repo(), github, project_board)
                 .await?;
             self.head.take();
 
@@ -249,7 +250,7 @@ impl MergeQueue {
 
             // Remove the PR from the Queue
             // XXX Maybe mark as "Failed"?
-            pull.update_status(Status::InReview, github, project_board)
+            pull.update_status(Status::InReview, config.repo(), github, project_board)
                 .await?;
             self.head = None;
 
@@ -315,8 +316,13 @@ impl MergeQueue {
                 repo.push_branch("auto")?;
                 info!("pushed 'auto' branch");
 
-                pull.update_status(Status::testing(merge_oid), github, project_board)
-                    .await?;
+                pull.update_status(
+                    Status::testing(merge_oid),
+                    config.repo(),
+                    github,
+                    project_board,
+                )
+                .await?;
                 self.head = Some(pull.number);
 
                 // Create github status
@@ -335,7 +341,7 @@ impl MergeQueue {
                     )
                     .await?;
             } else {
-                pull.update_status(Status::InReview, github, project_board)
+                pull.update_status(Status::InReview, config.repo(), github, project_board)
                     .await?;
 
                 github

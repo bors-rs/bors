@@ -1,4 +1,4 @@
-use crate::{graphql::GithubClient, project_board::ProjectBoard, Result};
+use crate::{config::RepoConfig, graphql::GithubClient, project_board::ProjectBoard, Result};
 use github::Oid;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -25,7 +25,7 @@ pub struct PullRequestState {
     pub approved_by: HashSet<String>,
     pub maintainer_can_modify: bool, // Use to enable 'rebase' merging and having github know a PR has been merged
     pub mergeable: bool,
-    pub labels: Vec<String>,
+    pub labels: HashSet<String>,
 
     pub priority: u32,
     pub status: Status,
@@ -125,16 +125,66 @@ impl PullRequestState {
     pub async fn update_status(
         &mut self,
         status: Status,
+        config: &RepoConfig,
         github: &GithubClient,
         project_board: Option<&ProjectBoard>,
     ) -> Result<()> {
         self.status = status;
+
+        self.update_labels(config, github).await?;
 
         if let Some(board) = project_board {
             match &self.status {
                 Status::InReview => board.move_to_review(github, &self).await?,
                 Status::Queued => board.move_to_queued(github, &self).await?,
                 Status::Testing { .. } => board.move_to_testing(github, &self).await?,
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn update_labels(
+        &mut self,
+        config: &RepoConfig,
+        github: &GithubClient,
+    ) -> Result<()> {
+        self.remove_labels(config, github).await?;
+
+        let label = match &self.status {
+            Status::InReview => config.labels().waiting_for_review(),
+            Status::Queued => config.labels().queued(),
+            Status::Testing { .. } => config.labels().testing(),
+        };
+        github
+            .issues()
+            .add_lables(
+                config.owner(),
+                config.name(),
+                self.number,
+                vec![label.into()],
+            )
+            .await?;
+        self.labels.insert(label.into());
+
+        Ok(())
+    }
+
+    pub async fn remove_labels(
+        &mut self,
+        config: &RepoConfig,
+        github: &GithubClient,
+    ) -> Result<()> {
+        let owner = config.owner();
+        let name = config.name();
+
+        for label in config.labels().all() {
+            if self.labels.contains(label) {
+                github
+                    .issues()
+                    .remove_label(owner, name, self.number, label)
+                    .await?;
+                self.labels.remove(label);
             }
         }
 

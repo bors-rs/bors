@@ -62,6 +62,10 @@ pub struct RepoConfig {
 
     /// Timeout for tests in seconds
     timeout_seconds: Option<u64>,
+
+    /// Labels
+    #[serde(default)]
+    labels: Labels,
 }
 
 impl RepoConfig {
@@ -97,6 +101,10 @@ impl RepoConfig {
         let seconds = self.timeout_seconds.unwrap_or(DEFAULT_TIMEOUT_SECONDS);
         ::std::time::Duration::from_secs(seconds)
     }
+
+    pub fn labels(&self) -> &Labels {
+        &self.labels
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -107,4 +115,34 @@ pub struct ChecksConfig {
 #[derive(Debug, Deserialize)]
 pub struct StatusConfig {
     context: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct Labels {
+    waiting_for_review: Option<String>,
+    queued: Option<String>,
+    testing: Option<String>,
+}
+
+impl Labels {
+    pub fn waiting_for_review(&self) -> &str {
+        self.waiting_for_review
+            .as_deref()
+            .unwrap_or("bors-waiting-for-review")
+    }
+
+    pub fn queued(&self) -> &str {
+        self.queued.as_deref().unwrap_or("bors-waiting-in-queue")
+    }
+
+    pub fn testing(&self) -> &str {
+        self.queued.as_deref().unwrap_or("bors-waiting-on-ci")
+    }
+
+    pub fn all(&self) -> impl Iterator<Item = &str> {
+        use std::iter::once;
+        once(self.waiting_for_review())
+            .chain(once(self.queued()))
+            .chain(once(self.testing()))
+    }
 }

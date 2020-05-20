@@ -192,6 +192,9 @@ impl EventProcessor {
                 if let Some(board) = &self.project_board {
                     board.create_card(&self.github, &mut state).await?;
                 }
+                state
+                    .update_labels(self.config.repo(), &self.github)
+                    .await?;
 
                 if self.pulls.insert(state.number, state).is_some() {
                     warn!("Opened/Reopened event replaced an existing PullRequestState");
@@ -210,14 +213,25 @@ impl EventProcessor {
 
                 // XXX Do we need to call into the MergeQueue to notify it that a PR was merged or
                 // closed?
-                match (
-                    &mut self.pulls.remove(&event.pull_request.number),
-                    &self.project_board,
-                ) {
-                    (Some(pull), Some(board)) => {
-                        board.delete_card(&self.github, pull).await?;
+                if let Some(mut pull) = self.pulls.remove(&event.pull_request.number) {
+                    if let Some(board) = &self.project_board {
+                        board.delete_card(&self.github, &mut pull).await?;
                     }
-                    _ => {}
+                    pull.remove_labels(self.config.repo(), &self.github).await?;
+                }
+            }
+            PullRequestEventAction::Labeled => {
+                if let Some(label) = &event.label {
+                    if let Some(pull) = self.pulls.get_mut(&event.pull_request.number) {
+                        pull.labels.insert(label.name.clone());
+                    }
+                }
+            }
+            PullRequestEventAction::Unlabeled => {
+                if let Some(label) = &event.label {
+                    if let Some(pull) = self.pulls.get_mut(&event.pull_request.number) {
+                        pull.labels.remove(&label.name);
+                    }
                 }
             }
 
@@ -397,6 +411,29 @@ impl EventProcessor {
         )
         .await?;
 
+        // Ensure all labels exist
+        let owner = self.config.repo().owner();
+        let name = self.config.repo().name();
+        for label in self.config.repo().labels().all() {
+            if self
+                .github
+                .issues()
+                .get_label(owner, name, label)
+                .await
+                .is_err()
+            {
+                self.github
+                    .issues()
+                    .create_label(owner, name, label, "D0D8D8", None)
+                    .await?;
+            }
+        }
+
+        // Reset all the labesl on each PR
+        for (_n, pull) in self.pulls.iter_mut() {
+            pull.update_labels(self.config.repo(), &self.github).await?;
+        }
+
         self.project_board = Some(board);
 
         info!("Done Synchronizing");
@@ -456,7 +493,7 @@ impl<'a> CommandContext<'a> {
 
     pub async fn update_pr_status(&mut self, status: Status) -> Result<()> {
         self.pull_request
-            .update_status(status, self.github, self.project_board)
+            .update_status(status, self.config, self.github, self.project_board)
             .await?;
 
         Ok(())
