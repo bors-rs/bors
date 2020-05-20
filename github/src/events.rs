@@ -868,6 +868,9 @@ pub struct PullRequestEvent {
     /// place of "requested_user" with the same delivery behavior.
     pub requested_team: Option<Team>,
 
+    /// Present when aciton is `labeled` or `unlabeled`
+    pub label: Option<Label>,
+
     // Populated by Webhook events
     pub repository: Repository,
     pub sender: User,
