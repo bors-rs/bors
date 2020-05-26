@@ -117,7 +117,14 @@ impl GitRepository {
             Ok(None)
         } else {
             let head_oid = self.git().head_oid()?;
-            Ok(Some(head_oid))
+
+            // If the head_oid and base_oid's match after the rebase then it means that the rebased
+            // commits resulted in no-ops
+            if head_oid == *base_oid {
+                Ok(None)
+            } else {
+                Ok(Some(head_oid))
+            }
         }
     }
 
