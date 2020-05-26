@@ -73,11 +73,12 @@ impl GitRepository {
         base_ref: &str,
         head_oid: &Oid,
         branch: &str,
+        fixup_all: bool,
     ) -> Result<Option<Oid>> {
         // Fetch base ref and head_oid
         self.fetch(base_ref, head_oid)?;
         let base_oid = self.git().ref_to_oid(&format!("origin/{}", base_ref))?;
-        self.rebase(&base_oid, head_oid, branch)
+        self.rebase(&base_oid, head_oid, branch, fixup_all)
     }
 
     fn fetch(&mut self, base_ref: &str, oid: &Oid) -> Result<()> {
@@ -85,12 +86,31 @@ impl GitRepository {
     }
 
     // None represents a Merge conflict
-    fn rebase(&mut self, base_oid: &Oid, head_oid: &Oid, branch: &str) -> Result<Option<Oid>> {
+    fn rebase(
+        &mut self,
+        base_oid: &Oid,
+        head_oid: &Oid,
+        branch: &str,
+        fixup_all: bool,
+    ) -> Result<Option<Oid>> {
         // First create the branch to work on for the rebase
         self.git().create_branch(branch, head_oid)?;
 
+        if fixup_all {
+            // Get the first commit in the PR
+            let oid = self.git().get_first_commit(base_oid, head_oid)?;
+
+            // This shouldn't result in a merge conflict since we're just rewording each commit
+            // message in the series
+            self.git().rebase(
+                &oid,
+                false,
+                Some(format!("git commit --amend --fixup={}", oid)),
+            )?;
+        }
+
         // Attempt to perform the rebase
-        if self.git().rebase(base_oid).is_err() {
+        if self.git().rebase(base_oid, true, None).is_err() {
             // the rebase failed, probably due to a merge conflict so we need to reset the state of
             // the tree and abort the rebase
             self.git().rebase_abort()?;
@@ -228,12 +248,33 @@ impl Git {
         Ok(())
     }
 
-    pub fn rebase(mut self, base_oid: &Oid) -> Result<()> {
-        self.inner
-            .args(&["rebase", "-i", "--autosquash"])
-            .arg(base_oid.to_string());
+    pub fn rebase(mut self, base_oid: &Oid, autosquash: bool, exec: Option<String>) -> Result<()> {
+        self.inner.args(&["rebase", "-i"]);
+        self.inner.arg(base_oid.to_string());
+
+        if autosquash {
+            self.inner.arg("--autosquash");
+        }
+
+        if let Some(exec) = exec {
+            self.inner.arg("--exec");
+            self.inner.arg(exec);
+        }
+
         self.run()?;
         Ok(())
+    }
+
+    pub fn get_first_commit(mut self, base_oid: &Oid, head_oid: &Oid) -> Result<Oid> {
+        self.inner
+            .arg("rev-list")
+            .arg(&format!("{}..{}", base_oid, head_oid));
+        let output = self.run()?;
+        let first = output
+            .lines()
+            .last()
+            .ok_or_else(|| anyhow!("unable to query first commit in series"))?;
+        Ok(Oid::from_str(first.trim()))
     }
 
     pub fn head_oid(self) -> Result<Oid> {
