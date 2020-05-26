@@ -256,7 +256,7 @@ impl Git {
     }
 
     pub fn rebase(mut self, base_oid: &Oid, autosquash: bool, exec: Option<String>) -> Result<()> {
-        self.inner.args(&["rebase", "-i"]);
+        self.inner.args(&["rebase", "-i", "--force-rebase"]);
         self.inner.arg(base_oid.to_string());
 
         if autosquash {
