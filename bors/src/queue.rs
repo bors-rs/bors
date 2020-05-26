@@ -59,7 +59,7 @@ impl MergeQueue {
             .take()
             .expect("land_pr should only be called when there is a PR to land");
 
-        let mut pull = pulls.remove(&head).expect("PR should exist");
+        let mut pull = pulls.get_mut(&head).expect("PR should exist");
         let merge_oid = match &pull.status {
             Status::Testing { merge_oid, .. } => merge_oid,
             // XXX Fix this
@@ -67,18 +67,42 @@ impl MergeQueue {
         };
         let head_repo = pull.head_repo.as_ref().unwrap();
 
-        assert!(pull.maintainer_can_modify);
-
         // Before 'merging' the PR into the base ref we first update the PR with the rebased
         // commits that are to be imminently merged using the `maintainer_can_modify` feature.
         // This is done so that when the commits are finally pushed to the base ref that Github
         // will properly mark the PR as being 'merged'.
-        repo.push_to_remote(
-            &head_repo,
-            &pull.head_ref_name,
-            &pull.head_ref_oid,
-            &merge_oid,
-        )?;
+        if repo
+            .push_to_remote(
+                &head_repo,
+                &pull.head_ref_name,
+                &pull.head_ref_oid,
+                &merge_oid,
+            )
+            .is_err()
+        {
+            info!(
+                "unable to update pr #{} in-place. maintainer_can_modify: {}",
+                pull.number, pull.maintainer_can_modify
+            );
+
+            pull.update_status(Status::InReview, config.repo(), github, project_board)
+                .await?;
+
+            github
+                .issues()
+                .create_comment(
+                    config.repo().owner(),
+                    config.repo().name(),
+                    pull.number,
+                    &format!(":exclamation: failed to update PR in-place; halting merge.\n\
+                    Make sure that that [\"Allow edits from maintainers\"]\
+                    (https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/allowing-changes-to-a-pull-request-branch-created-from-a-fork) \
+                    is enabled before attempting to reland this PR."),
+                )
+                .await?;
+
+            return Ok(());
+        };
 
         // Finally 'merge' the PR by updating the 'base_ref' with `merge_oid`
         github
@@ -96,6 +120,9 @@ impl MergeQueue {
             board.delete_card(github, &mut pull).await?;
         }
         pull.remove_labels(config.repo(), github).await?;
+
+        // Actually remove the PR
+        pulls.remove(&head);
 
         Ok(())
     }

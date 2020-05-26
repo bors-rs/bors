@@ -189,6 +189,31 @@ impl EventProcessor {
 
                 info!("PR #{} Opened", state.number);
 
+                // Bors needs write access to the base repo to be able to function, so if the PR
+                // originates from the base repo we don't need to worry about the
+                // maintainer_can_modify bit (which actually can't be set oddly enough)
+                let pr_is_from_base_repo = state
+                    .head_repo
+                    .as_ref()
+                    .map(|repo| self.config.repo().repo() == repo)
+                    .unwrap_or(false);
+
+                if !state.maintainer_can_modify && !pr_is_from_base_repo {
+                    self.github
+                        .issues()
+                        .create_comment(
+                            self.config.repo().owner(),
+                            self.config.repo().name(),
+                            state.number,
+                            &format!(":exclamation: before this PR can be merged please make sure that you enable \
+                            [\"Allow edits from maintainers\"]\
+                            (https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/allowing-changes-to-a-pull-request-branch-created-from-a-fork).\n\n\
+                            This is needed for tooling to be able to update this PR in-place so that Github can \
+                            properly recognize and mark it as merged once its merged into the upstream branch"),
+                        )
+                        .await?;
+                }
+
                 if let Some(board) = &self.project_board {
                     board.create_card(&self.github, &mut state).await?;
                 }

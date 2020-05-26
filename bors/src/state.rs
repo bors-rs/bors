@@ -217,7 +217,7 @@ impl PullRequestState {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct Repo {
     owner: String,
     name: String,
