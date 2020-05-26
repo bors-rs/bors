@@ -301,7 +301,7 @@ impl Command {
 
         info!("attempting to mark pr #{} ReadyToLand", ctx.pr().number);
 
-        let msg = match ctx.pr().status {
+        match ctx.pr().status {
             Status::InReview => {
                 if ctx.pr().approved_by.is_empty() {
                     info!(
@@ -309,28 +309,27 @@ impl Command {
                         ctx.pr().number
                     );
 
-                    format!(
+                    let msg = format!(
                         "@{} :exclamation: This PR is still missing approvals, unable to queue for landing",
                         ctx.sender(),
-                    )
+                    );
+                    ctx.create_pr_comment(&msg).await?;
                 } else {
                     ctx.update_pr_status(Status::Queued).await?;
                     info!("pr #{} queued for landing", ctx.pr().number);
-
-                    ":mailbox_with_mail: queued for landing".to_string()
                 }
             }
             Status::Queued | Status::Testing { .. } => {
                 info!("pr #{} already queued for landing", ctx.pr().number);
 
-                format!(
+                let msg = format!(
                     "@{} :bulb: This PR is already queued for landing",
                     ctx.sender(),
-                )
-            }
-        };
+                );
 
-        ctx.create_pr_comment(&msg).await?;
+                ctx.create_pr_comment(&msg).await?;
+            }
+        }
 
         Ok(())
     }
