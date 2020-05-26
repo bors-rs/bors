@@ -197,6 +197,9 @@ impl Command {
                 if let Some(priority) = a.priority() {
                     Self::set_priority(&mut ctx, priority);
                 }
+                if let Some(squash) = a.squash {
+                    Self::set_squash(&mut ctx, squash);
+                }
 
                 Self::approve_pr(&mut ctx, false).await?;
             }
@@ -204,6 +207,9 @@ impl Command {
             CommandType::Land(l) => {
                 if let Some(priority) = l.priority() {
                     Self::set_priority(&mut ctx, priority);
+                }
+                if let Some(squash) = l.squash {
+                    Self::set_squash(&mut ctx, squash);
                 }
 
                 Self::approve_pr(&mut ctx, true).await?;
@@ -226,6 +232,11 @@ impl Command {
     fn set_priority(ctx: &mut CommandContext, priority: u32) {
         info!("#{}: set priority to {}", ctx.pr().number, priority);
         ctx.pr_mut().priority = priority;
+    }
+
+    fn set_squash(ctx: &mut CommandContext, squash: bool) {
+        info!("#{}: set squash to {}", ctx.pr().number, squash);
+        ctx.pr_mut().squash = squash;
     }
 
     async fn approve_pr(ctx: &mut CommandContext<'_>, is_land_command: bool) -> Result<()> {
@@ -379,11 +390,15 @@ impl std::fmt::Display for Help {
 #[derive(Debug)]
 struct Approve {
     priority: Option<Priority>,
+    squash: Option<bool>,
 }
 
 impl Approve {
     fn new() -> Self {
-        Self { priority: None }
+        Self {
+            priority: None,
+            squash: None,
+        }
     }
 
     fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
@@ -391,11 +406,18 @@ impl Approve {
         I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
     {
         let mut priority = None;
+        let mut squash = None;
 
         for (key, value) in iter {
             match key {
                 "p" | "priority" => {
                     priority = Some(Priority::from_arg(value)?);
+                }
+                "squash+" => {
+                    squash = Some(true);
+                }
+                "squash-" => {
+                    squash = Some(false);
                 }
 
                 // First key we hit that we don't understand we should just bail
@@ -403,7 +425,7 @@ impl Approve {
             }
         }
 
-        Ok(Self { priority })
+        Ok(Self { priority, squash })
     }
 
     fn priority(&self) -> Option<u32> {
@@ -414,6 +436,7 @@ impl Approve {
 #[derive(Debug)]
 struct Land {
     priority: Option<Priority>,
+    squash: Option<bool>,
 }
 
 impl Land {
@@ -422,11 +445,18 @@ impl Land {
         I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
     {
         let mut priority = None;
+        let mut squash = None;
 
         for (key, value) in iter {
             match key {
                 "p" | "priority" => {
                     priority = Some(Priority::from_arg(value)?);
+                }
+                "squash+" => {
+                    squash = Some(true);
+                }
+                "squash-" => {
+                    squash = Some(false);
                 }
 
                 // First key we hit that we don't understand we should just bail
@@ -434,7 +464,7 @@ impl Land {
             }
         }
 
-        Ok(Self { priority })
+        Ok(Self { priority, squash })
     }
 
     fn priority(&self) -> Option<u32> {
