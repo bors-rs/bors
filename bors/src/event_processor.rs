@@ -8,9 +8,8 @@ use crate::{
     state::{PullRequestState, Status},
     Config, Result,
 };
-use futures::{channel::mpsc, lock::Mutex, sink::SinkExt, stream::StreamExt};
+use futures::{channel::mpsc, sink::SinkExt, stream::StreamExt};
 use github::{Event, EventType, NodeId};
-use hotpot_db::HotPot;
 use log::{error, info, warn};
 use std::collections::HashMap;
 
@@ -67,7 +66,6 @@ pub struct EventProcessor {
     merge_queue: MergeQueue,
     project_board: Option<ProjectBoard>,
     pulls: HashMap<u64, PullRequestState>,
-    db: Mutex<HotPot>,
     requests_rx: mpsc::Receiver<Request>,
 }
 
@@ -86,7 +84,6 @@ impl EventProcessor {
                 merge_queue: MergeQueue::new(),
                 project_board: None,
                 pulls: HashMap::new(),
-                db: Mutex::new(HotPot::new()),
                 requests_rx: rx,
             },
         ))
