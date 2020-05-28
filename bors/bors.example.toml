@@ -1,0 +1,33 @@
+# Webhook secret used to verify webhooks originated from Github
+secret = ""
+
+# Github API token used for interacting with the Github web API
+github_api_token = ""
+
+[git]
+
+# file where an SSH private key lives, needed for fetching/pushing
+ssh-key-file = ""
+
+# The name+email used for creating commits
+user = ""
+email = ""
+
+[repo]
+
+# Identify which repository is being managed:
+#   github.com/<owner>/<name>
+owner = ""
+name = ""
+
+# Allow author's to approve their own PRs
+# allow-self-review = true
+
+# Time that bors will wait before giving up on CI completing
+# timeout-sections = <seconds>
+
+# Github checks and status's required to pass on the `auto` branch before merging a PR
+# [repo.checks.<app-name>]
+# name = ""
+# [repo.status.<app-name>]
+# name = ""
