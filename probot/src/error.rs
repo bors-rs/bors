@@ -11,6 +11,8 @@ pub enum Error {
     Http(#[from] hyper::http::Error),
     #[error("hyper error")]
     Hyper(#[from] hyper::Error),
+    #[error("reqwest error")]
+    Reqwest(#[from] reqwest::Error),
     #[error("json error")]
     Json(#[from] serde_json::Error),
     #[error("utf8 error")]

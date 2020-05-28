@@ -1,9 +1,8 @@
 use crate::{Result, Server};
 use bytes::{Buf, BytesMut};
 use github::{EventType, Webhook};
-use hyper::{body::HttpBody, Body, Client, Request};
-use hyper_tls::HttpsConnector;
 use log::{debug, info};
+use reqwest::{Client, Response};
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use std::{borrow::Cow, str};
@@ -27,18 +26,16 @@ impl SmeeClient {
     pub async fn start(mut self) -> Result<()> {
         info!("Starting SmeeClient with {}", self.uri);
 
-        let connector = HttpsConnector::new();
-        let client = Client::builder().build(connector);
-        let request = Request::builder()
-            .method("GET")
-            .uri(&self.uri)
+        let client = Client::new();
+        let mut response = client
+            .get(&self.uri)
             .header("Accept", "text/event-stream")
-            .body(Body::empty())?;
-        let mut response = client.request(request).await?;
+            .body("")
+            .send()
+            .await?;
         debug!("response status = {}", response.status());
 
-        let body = response.body_mut();
-        let mut event_parser = SmeeEventParser::from_body(body);
+        let mut event_parser = SmeeEventParser::from_body(&mut response);
         while let Some(event) = event_parser.next().await? {
             match event {
                 SmeeEvent::Ready => debug!("ready!"),
@@ -80,12 +77,12 @@ struct ServerSentEvent<'a> {
 }
 
 struct SmeeEventParser<'b> {
-    body: &'b mut Body,
+    body: &'b mut Response,
     buffer: BytesMut,
 }
 
 impl<'b> SmeeEventParser<'b> {
-    fn from_body(body: &'b mut Body) -> Self {
+    fn from_body(body: &'b mut Response) -> Self {
         Self {
             body,
             buffer: BytesMut::new(),
@@ -112,8 +109,8 @@ impl<'b> SmeeEventParser<'b> {
                 return Ok(Some(self.buffer.split_to(idx)));
             }
 
-            if let Some(data) = self.body.data().await {
-                let data = data?;
+            if let Some(data) = self.body.chunk().await? {
+                //let data = data?;
                 self.buffer.extend_from_slice(data.bytes());
             } else {
                 return Ok(None);
