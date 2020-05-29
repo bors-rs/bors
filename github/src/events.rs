@@ -843,7 +843,7 @@ pub enum PullRequestEventAction {
     Reopened,
     Synchronize,
     ReadyForReview,
-    ReviewRequest,
+    ReviewRequested,
     ReviewRequestRemoved,
     Locked,
     Unlocked,
