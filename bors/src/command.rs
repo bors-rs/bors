@@ -198,7 +198,7 @@ impl Command {
                     Self::set_priority(&mut ctx, priority);
                 }
                 if let Some(squash) = a.squash {
-                    Self::set_squash(&mut ctx, squash);
+                    Self::set_squash(&mut ctx, squash).await?;
                 }
 
                 Self::approve_pr(&mut ctx, false).await?;
@@ -209,7 +209,7 @@ impl Command {
                     Self::set_priority(&mut ctx, priority);
                 }
                 if let Some(squash) = l.squash {
-                    Self::set_squash(&mut ctx, squash);
+                    Self::set_squash(&mut ctx, squash).await?;
                 }
 
                 Self::approve_pr(&mut ctx, true).await?;
@@ -234,9 +234,18 @@ impl Command {
         ctx.pr_mut().priority = priority;
     }
 
-    fn set_squash(ctx: &mut CommandContext, squash: bool) {
+    async fn set_squash(ctx: &mut CommandContext<'_>, squash: bool) -> Result<()> {
         info!("#{}: set squash to {}", ctx.pr().number, squash);
-        ctx.pr_mut().squash = squash;
+
+        let label = ctx.config().labels().squash().to_owned();
+
+        if squash {
+            ctx.set_label(&label).await?;
+        } else {
+            ctx.remove_label(&label).await?;
+        }
+
+        Ok(())
     }
 
     async fn approve_pr(ctx: &mut CommandContext<'_>, is_land_command: bool) -> Result<()> {

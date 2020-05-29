@@ -513,4 +513,16 @@ impl<'a> CommandContext<'a> {
 
         Ok(())
     }
+
+    pub async fn set_label(&mut self, label: &str) -> Result<()> {
+        self.pull_request
+            .add_label(self.config, self.github, label)
+            .await
+    }
+
+    pub async fn remove_label(&mut self, label: &str) -> Result<()> {
+        self.pull_request
+            .remove_label(self.config, self.github, label)
+            .await
+    }
 }

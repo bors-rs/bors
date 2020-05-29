@@ -112,7 +112,6 @@ impl From<list_pulls::ListPullsRepositoryPullRequestsNodes> for crate::state::Pu
 
             approved_by: std::collections::HashSet::new(),
             priority: 0,
-            squash: false,
             status: crate::state::Status::InReview,
             project_card_id: None,
         }

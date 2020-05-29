@@ -350,7 +350,7 @@ impl MergeQueue {
                 &pull.head_ref_oid,
                 "auto",
                 pull.number,
-                pull.squash,
+                pull.has_label(config.repo().labels().squash()),
             )? {
                 repo.push_branch("auto")?;
                 info!("pushed 'auto' branch");

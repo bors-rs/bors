@@ -28,7 +28,6 @@ pub struct PullRequestState {
     pub labels: HashSet<String>,
 
     pub priority: u32,
-    pub squash: bool,
     pub status: Status,
     pub project_card_id: Option<u64>,
 }
@@ -103,7 +102,6 @@ impl PullRequestState {
             mergeable: pull.mergeable.unwrap_or(false),
             labels,
             priority: 0,
-            squash: false,
             status: Status::InReview,
             project_card_id: None,
         }
@@ -144,7 +142,6 @@ impl PullRequestState {
         Ok(())
     }
 
-    #[allow(unused)]
     pub async fn add_label(
         &mut self,
         config: &RepoConfig,
@@ -164,12 +161,10 @@ impl PullRequestState {
         Ok(())
     }
 
-    #[allow(unused)]
     pub fn has_label(&self, label: &str) -> bool {
         self.labels.contains(label)
     }
 
-    #[allow(unused)]
     pub async fn remove_label(
         &mut self,
         config: &RepoConfig,
