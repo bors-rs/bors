@@ -112,12 +112,7 @@ impl GitRepository {
         }
 
         // Attempt to perform the rebase
-        let exec = format!(
-            "GIT_EDITOR='git interpret-trailers --trailer \"Closes: #{}\" --in-place' \
-                    git commit --amend",
-            pr_number
-        );
-        if let Err(e) = self.git().rebase(base_oid, true, Some(exec)) {
+        if let Err(e) = self.git().rebase(base_oid, true, None) {
             info!("Rebase failed: {}", e);
 
             // the rebase failed, probably due to a merge conflict so we need to reset the state of
@@ -132,6 +127,14 @@ impl GitRepository {
             if head_oid == *base_oid {
                 Ok(None)
             } else {
+                // Amend the tip commit to annotate that it closes the PR
+                let editor = format!(
+                    "git interpret-trailers --trailer \"Closes: #{}\" --in-place",
+                    pr_number
+                );
+                self.git().amend(&editor)?;
+                let head_oid = self.git().head_oid()?;
+
                 Ok(Some(head_oid))
             }
         }
@@ -200,6 +203,11 @@ impl Git {
         self
     }
 
+    pub fn with_editor(mut self, editor: &str) -> Self {
+        self.inner.env("GIT_EDITOR", editor);
+        self
+    }
+
     fn run(mut self) -> Result<String> {
         let output = self.inner.output()?;
 
@@ -255,6 +263,12 @@ impl Git {
             .args(&["checkout", "-B", branch_name])
             .arg(oid.to_string());
         self.run()?;
+        Ok(())
+    }
+
+    pub fn amend(mut self, editor: &str) -> Result<()> {
+        self.inner.args(&["commit", "--amend"]);
+        self.with_editor(editor).run()?;
         Ok(())
     }
 
