@@ -337,9 +337,13 @@ impl MergeQueue {
 
             // Attempt to rebase the PR onto 'base_ref' and push to the 'auto' branch for
             // testing
-            if let Some(merge_oid) =
-                repo.fetch_and_rebase(&pull.base_ref_name, &pull.head_ref_oid, "auto", pull.squash)?
-            {
+            if let Some(merge_oid) = repo.fetch_and_rebase(
+                &pull.base_ref_name,
+                &pull.head_ref_oid,
+                "auto",
+                pull.number,
+                pull.squash,
+            )? {
                 repo.push_branch("auto")?;
                 info!("pushed 'auto' branch");
 

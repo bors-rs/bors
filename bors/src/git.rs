@@ -73,12 +73,13 @@ impl GitRepository {
         base_ref: &str,
         head_oid: &Oid,
         branch: &str,
+        pr_number: u64,
         fixup_all: bool,
     ) -> Result<Option<Oid>> {
         // Fetch base ref and head_oid
         self.fetch(base_ref, head_oid)?;
         let base_oid = self.git().ref_to_oid(&format!("origin/{}", base_ref))?;
-        self.rebase(&base_oid, head_oid, branch, fixup_all)
+        self.rebase(&base_oid, head_oid, branch, pr_number, fixup_all)
     }
 
     fn fetch(&mut self, base_ref: &str, oid: &Oid) -> Result<()> {
@@ -91,6 +92,7 @@ impl GitRepository {
         base_oid: &Oid,
         head_oid: &Oid,
         branch: &str,
+        pr_number: u64,
         fixup_all: bool,
     ) -> Result<Option<Oid>> {
         // First create the branch to work on for the rebase
@@ -110,7 +112,14 @@ impl GitRepository {
         }
 
         // Attempt to perform the rebase
-        if self.git().rebase(base_oid, true, None).is_err() {
+        let exec = format!(
+            "GIT_EDITOR='git interpret-trailers --trailer \"Closes: #{}\" --in-place' \
+                    git commit --amend",
+            pr_number
+        );
+        if let Err(e) = self.git().rebase(base_oid, true, Some(exec)) {
+            info!("Rebase failed: {}", e);
+
             // the rebase failed, probably due to a merge conflict so we need to reset the state of
             // the tree and abort the rebase
             self.git().rebase_abort()?;
