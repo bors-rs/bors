@@ -195,7 +195,9 @@ impl EventProcessor {
                     .map(|repo| self.config.repo().repo() == repo)
                     .unwrap_or(false);
 
-                if !state.maintainer_can_modify && !pr_is_from_base_repo {
+                // XXX turn off this branch until we can figure out if the managed repo is private
+                // or not
+                if !state.maintainer_can_modify && !pr_is_from_base_repo && false {
                     self.github
                         .issues()
                         .create_comment(
