@@ -128,7 +128,6 @@ impl MergeQueue {
         if let Some(board) = project_board {
             board.delete_card(github, &mut pull).await?;
         }
-        pull.remove_labels(config.repo(), github).await?;
 
         // Actually remove the PR
         pulls.remove(&head);

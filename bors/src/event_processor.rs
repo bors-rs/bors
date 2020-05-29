@@ -216,9 +216,6 @@ impl EventProcessor {
                 if let Some(board) = &self.project_board {
                     board.create_card(&self.github, &mut state).await?;
                 }
-                state
-                    .update_labels(self.config.repo(), &self.github)
-                    .await?;
 
                 if self.pulls.insert(state.number, state).is_some() {
                     warn!("Opened/Reopened event replaced an existing PullRequestState");
@@ -241,7 +238,6 @@ impl EventProcessor {
                     if let Some(board) = &self.project_board {
                         board.delete_card(&self.github, &mut pull).await?;
                     }
-                    pull.remove_labels(self.config.repo(), &self.github).await?;
                 }
             }
             PullRequestEventAction::Labeled => {
@@ -451,11 +447,6 @@ impl EventProcessor {
                     .create_label(owner, name, label, "D0D8D8", None)
                     .await?;
             }
-        }
-
-        // Reset all the labesl on each PR
-        for (_n, pull) in self.pulls.iter_mut() {
-            pull.update_labels(self.config.repo(), &self.github).await?;
         }
 
         self.project_board = Some(board);

@@ -127,13 +127,11 @@ impl PullRequestState {
     pub async fn update_status(
         &mut self,
         status: Status,
-        config: &RepoConfig,
+        _config: &RepoConfig,
         github: &GithubClient,
         project_board: Option<&ProjectBoard>,
     ) -> Result<()> {
         self.status = status;
-
-        self.update_labels(config, github).await?;
 
         if let Some(board) = project_board {
             match &self.status {
@@ -146,18 +144,13 @@ impl PullRequestState {
         Ok(())
     }
 
-    pub async fn update_labels(
+    #[allow(unused)]
+    pub async fn add_label(
         &mut self,
         config: &RepoConfig,
         github: &GithubClient,
+        label: &str,
     ) -> Result<()> {
-        self.remove_labels(config, github).await?;
-
-        let label = match &self.status {
-            Status::InReview => config.labels().waiting_for_review(),
-            Status::Queued => config.labels().queued(),
-            Status::Testing { .. } => config.labels().testing(),
-        };
         github
             .issues()
             .add_lables(
@@ -168,26 +161,27 @@ impl PullRequestState {
             )
             .await?;
         self.labels.insert(label.into());
-
         Ok(())
     }
 
-    pub async fn remove_labels(
+    #[allow(unused)]
+    pub fn has_label(&self, label: &str) -> bool {
+        self.labels.contains(label)
+    }
+
+    #[allow(unused)]
+    pub async fn remove_label(
         &mut self,
         config: &RepoConfig,
         github: &GithubClient,
+        label: &str,
     ) -> Result<()> {
-        let owner = config.owner();
-        let name = config.name();
-
-        for label in config.labels().all() {
-            if self.labels.contains(label) {
-                github
-                    .issues()
-                    .remove_label(owner, name, self.number, label)
-                    .await?;
-                self.labels.remove(label);
-            }
+        if self.labels.contains(label) {
+            github
+                .issues()
+                .remove_label(config.owner(), config.name(), self.number, label)
+                .await?;
+            self.labels.remove(label);
         }
 
         Ok(())
