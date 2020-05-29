@@ -135,6 +135,18 @@ impl EventProcessor {
                 }
             }
             Event::PullRequestReview(e) => {
+                let pr_number = e.pull_request.number;
+                if let Some(pr) = self.pulls.get_mut(&pr_number) {
+                    pr.approved = self
+                        .github
+                        .get_review_decision(
+                            self.config.repo().owner(),
+                            self.config.repo().name(),
+                            pr_number,
+                        )
+                        .await?;
+                }
+
                 if e.action.is_submitted() {
                     self.process_review(&e.sender.login, e.pull_request.number, &e.review)
                         .await?;

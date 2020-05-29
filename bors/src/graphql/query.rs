@@ -56,6 +56,7 @@ impl From<list_pulls::ListPullsRepositoryPullRequestsNodes> for crate::state::Pu
             database_id,
             author,
             is_draft,
+            review_decision,
             maintainer_can_modify,
             mergeable,
             labels,
@@ -90,6 +91,11 @@ impl From<list_pulls::ListPullsRepositoryPullRequestsNodes> for crate::state::Pu
             None
         };
 
+        let approved = match review_decision {
+            Some(list_pulls::PullRequestReviewDecision::APPROVED) => true,
+            _ => false,
+        };
+
         Self {
             number: number as u64,
             id: database_id.unwrap() as u64, // XXX ensure this is always populated
@@ -111,8 +117,17 @@ impl From<list_pulls::ListPullsRepositoryPullRequestsNodes> for crate::state::Pu
             state: state.into(),
 
             approved_by: std::collections::HashSet::new(),
+            approved,
             status: crate::state::Status::InReview,
             project_card_id: None,
         }
     }
 }
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "src/graphql/github-schema.graphql",
+    query_path = "src/graphql/get_review_decision.graphql",
+    response_derives = "Debug"
+)]
+pub struct GetReviewDecision;

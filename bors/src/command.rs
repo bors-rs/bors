@@ -320,7 +320,10 @@ impl Command {
 
         match ctx.pr().status {
             Status::InReview => {
-                if ctx.pr().approved_by.is_empty() {
+                if ctx.pr().approved || ctx.config().allow_self_review() {
+                    ctx.update_pr_status(Status::Queued).await?;
+                    info!("pr #{} queued for landing", ctx.pr().number);
+                } else {
                     info!(
                         "pr #{} is missing approvals, unable to queue for landing",
                         ctx.pr().number
@@ -331,9 +334,6 @@ impl Command {
                         ctx.sender(),
                     );
                     ctx.create_pr_comment(&msg).await?;
-                } else {
-                    ctx.update_pr_status(Status::Queued).await?;
-                    info!("pr #{} queued for landing", ctx.pr().number);
                 }
             }
             Status::Queued | Status::Testing { .. } => {

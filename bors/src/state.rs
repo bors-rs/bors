@@ -23,6 +23,7 @@ pub struct PullRequestState {
     pub state: github::PullRequestState,
     pub is_draft: bool,
     pub approved_by: HashSet<String>,
+    pub approved: bool,
     pub maintainer_can_modify: bool, // Use to enable 'rebase' merging and having github know a PR has been merged
     pub mergeable: bool,
     pub labels: HashSet<String>,
@@ -97,6 +98,7 @@ impl PullRequestState {
             state,
             is_draft: pull.draft.unwrap_or(false),
             approved_by: HashSet::new(),
+            approved: false,
             maintainer_can_modify: pull.maintainer_can_modify.unwrap_or(false),
             mergeable: pull.mergeable.unwrap_or(false),
             labels,

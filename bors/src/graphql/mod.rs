@@ -82,6 +82,33 @@ impl GithubClient {
 
         Ok(ret)
     }
+
+    pub async fn get_review_decision(&self, owner: &str, name: &str, number: u64) -> Result<bool> {
+        use query::{
+            get_review_decision::{PullRequestReviewDecision, ResponseData, Variables},
+            GetReviewDecision,
+        };
+
+        let q = GetReviewDecision::build_query(Variables {
+            owner: owner.to_owned(),
+            name: name.to_owned(),
+            number: number as i64,
+        });
+
+        let response: ResponseData = self.0.graphql().query(&q).await?.into_inner();
+
+        let d = response
+            .repository
+            .and_then(|r| r.pull_request)
+            .and_then(|p| p.review_decision)
+            .map(|d| match d {
+                PullRequestReviewDecision::APPROVED => true,
+                _ => false,
+            })
+            .unwrap_or(false);
+
+        Ok(d)
+    }
 }
 
 impl Deref for GithubClient {
