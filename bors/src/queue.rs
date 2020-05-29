@@ -14,7 +14,9 @@ use std::{
 #[derive(Debug, PartialEq, Eq)]
 struct QueueEntry {
     number: u64,
-    priority: u32,
+
+    /// Indicates if the PR is high priority or not
+    priority: bool,
 }
 
 impl PartialOrd for QueueEntry {
@@ -336,7 +338,7 @@ impl MergeQueue {
             .collect();
         queue.sort_unstable_by_key(|p| QueueEntry {
             number: p.number,
-            priority: p.priority,
+            priority: p.has_label(config.repo().labels().high_priority()),
         });
         let mut queue = queue.into_iter();
 

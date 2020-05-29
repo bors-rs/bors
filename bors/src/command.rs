@@ -195,7 +195,7 @@ impl Command {
         match &self.command_type {
             CommandType::Approve(a) => {
                 if let Some(priority) = a.priority() {
-                    Self::set_priority(&mut ctx, priority);
+                    Self::set_priority(&mut ctx, priority).await?;
                 }
                 if let Some(squash) = a.squash {
                     Self::set_squash(&mut ctx, squash).await?;
@@ -206,7 +206,7 @@ impl Command {
             CommandType::Unapprove => Self::unapprove_pr(ctx).await?,
             CommandType::Land(l) => {
                 if let Some(priority) = l.priority() {
-                    Self::set_priority(&mut ctx, priority);
+                    Self::set_priority(&mut ctx, priority).await?;
                 }
                 if let Some(squash) = l.squash {
                     Self::set_squash(&mut ctx, squash).await?;
@@ -217,21 +217,29 @@ impl Command {
             }
             CommandType::Retry(r) => {
                 if let Some(priority) = r.priority() {
-                    Self::set_priority(&mut ctx, priority);
+                    Self::set_priority(&mut ctx, priority).await?;
                 }
                 unimplemented!();
             }
             CommandType::Cancel => Self::cancel_land(ctx).await?,
             CommandType::Help => ctx.create_pr_comment(&Help.to_string()).await?,
-            CommandType::Priority(p) => Self::set_priority(&mut ctx, p.priority()),
+            CommandType::Priority(p) => Self::set_priority(&mut ctx, p.priority()).await?,
         }
 
         Ok(())
     }
 
-    fn set_priority(ctx: &mut CommandContext, priority: u32) {
+    async fn set_priority(ctx: &mut CommandContext<'_>, priority: u32) -> Result<()> {
         info!("#{}: set priority to {}", ctx.pr().number, priority);
-        ctx.pr_mut().priority = priority;
+
+        let label = ctx.config().labels().high_priority().to_owned();
+        if priority > 0 {
+            ctx.set_label(&label).await?;
+        } else {
+            ctx.remove_label(&label).await?;
+        }
+
+        Ok(())
     }
 
     async fn set_squash(ctx: &mut CommandContext<'_>, squash: bool) -> Result<()> {
@@ -511,6 +519,7 @@ impl Retry {
     }
 }
 
+// XXX Don't have priority be an integer, it should be a boolean
 #[derive(Debug)]
 struct Priority {
     priority: u32,

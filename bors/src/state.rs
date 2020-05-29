@@ -27,7 +27,6 @@ pub struct PullRequestState {
     pub mergeable: bool,
     pub labels: HashSet<String>,
 
-    pub priority: u32,
     pub status: Status,
     pub project_card_id: Option<u64>,
 }
@@ -101,7 +100,6 @@ impl PullRequestState {
             maintainer_can_modify: pull.maintainer_can_modify.unwrap_or(false),
             mergeable: pull.mergeable.unwrap_or(false),
             labels,
-            priority: 0,
             status: Status::InReview,
             project_card_id: None,
         }

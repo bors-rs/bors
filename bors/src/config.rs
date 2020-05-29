@@ -118,8 +118,10 @@ pub struct StatusConfig {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Labels {
     squash: Option<String>,
+    high_priority: Option<String>,
 }
 
 impl Labels {
@@ -127,8 +129,14 @@ impl Labels {
         self.squash.as_deref().unwrap_or("bors-squash")
     }
 
+    pub fn high_priority(&self) -> &str {
+        self.high_priority
+            .as_deref()
+            .unwrap_or("bors-high-priority")
+    }
+
     pub fn all(&self) -> impl Iterator<Item = &str> {
         use std::iter::once;
-        once(self.squash())
+        once(self.squash()).chain(once(self.high_priority()))
     }
 }
