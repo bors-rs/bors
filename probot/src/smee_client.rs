@@ -1,7 +1,7 @@
 use crate::{Result, Server};
 use bytes::{Buf, BytesMut};
 use github::{EventType, Webhook};
-use log::{debug, info};
+use log::{debug, info, warn};
 use reqwest::{Client, Response};
 use serde::Deserialize;
 use serde_json::value::RawValue;
@@ -24,6 +24,15 @@ impl SmeeClient {
     //TODO take a closer look at the errors that happen in this call stack to determine which are
     // fatal and which should be handled and ignored
     pub async fn start(mut self) -> Result<()> {
+        // If there are any errors with the stream, log and restart the client
+        while let Err(e) = self.run().await {
+            warn!("Smee Error: {:?}", e);
+        }
+
+        Ok(())
+    }
+
+    async fn run(&mut self) -> Result<()> {
         info!("Starting SmeeClient with {}", self.uri);
 
         let client = Client::new();
