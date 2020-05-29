@@ -17,7 +17,6 @@ pub struct Command {
 #[derive(Debug)]
 enum CommandType {
     Approve(Approve),
-    Unapprove,
     Land(Land),
     Retry(Retry),
     Cancel,
@@ -29,7 +28,6 @@ impl CommandType {
     fn name(&self) -> &'static str {
         match &self {
             CommandType::Approve(_) => "Approve",
-            CommandType::Unapprove => "Unapprove",
             CommandType::Land(_) => "Land",
             CommandType::Retry(_) => "Retry",
             CommandType::Cancel => "Cancel",
@@ -115,7 +113,6 @@ impl Command {
 
         let command_type = match command_name {
             "approve" | "lgtm" | "r+" => CommandType::Approve(Approve::with_args(args)?),
-            "unapprove" | "r-" => CommandType::Unapprove,
             "land" | "merge" => CommandType::Land(Land::with_args(args)?),
             "retry" => CommandType::Retry(Retry::with_args(args)?),
             "cancel" | "stop" => CommandType::Cancel,
@@ -131,7 +128,7 @@ impl Command {
     pub fn from_review(review: &github::Review) -> Option<Command> {
         let command_type = match review.state {
             github::ReviewState::Approved => CommandType::Approve(Approve::new()),
-            github::ReviewState::ChangesRequested => CommandType::Unapprove,
+            github::ReviewState::ChangesRequested => return None,
             github::ReviewState::Commented => return None,
             github::ReviewState::Dismissed => return None,
         };
@@ -203,7 +200,6 @@ impl Command {
 
                 Self::approve_pr(&mut ctx, false).await?;
             }
-            CommandType::Unapprove => Self::unapprove_pr(ctx).await?,
             CommandType::Land(l) => {
                 if let Some(priority) = l.priority() {
                     Self::set_priority(&mut ctx, priority).await?;
@@ -294,25 +290,6 @@ impl Command {
         Ok(())
     }
 
-    async fn unapprove_pr(ctx: &mut CommandContext<'_>) -> Result<()> {
-        info!(
-            "#{}: '{}' revoked their approval",
-            ctx.pr().number,
-            ctx.sender()
-        );
-
-        let reviewer = ctx.sender().to_owned();
-        if ctx.pr_mut().approved_by.remove(&reviewer) {
-            ctx.create_pr_comment(&format!(
-                ":anguished: `{}`'s approval has been revoked",
-                ctx.sender()
-            ))
-            .await?;
-        }
-
-        Ok(())
-    }
-
     async fn mark_pr_ready_to_land(ctx: &mut CommandContext<'_>) -> Result<()> {
         use crate::state::Status;
 
@@ -378,10 +355,6 @@ impl std::fmt::Display for Help {
         writeln!(
             f,
             "- __Approve__ `approve`, `lgtm`, `r+`: add your approval to a PR"
-        )?;
-        writeln!(
-            f,
-            "- __Unapprove__ `unapprove`, `r-`: remove your approval to a PR"
         )?;
         writeln!(
             f,
