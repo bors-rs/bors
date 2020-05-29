@@ -74,45 +74,42 @@ impl MergeQueue {
             // commits that are to be imminently merged using the `maintainer_can_modify` feature.
             // This is done so that when the commits are finally pushed to the base ref that Github
             // will properly mark the PR as being 'merged'.
-            if repo
-                .push_to_remote(
-                    &head_repo,
-                    &pull.head_ref_name,
-                    &pull.head_ref_oid,
-                    &merge_oid,
-                )
-                .is_err()
+            if config.repo().maintainer_mode()
+                && repo
+                    .push_to_remote(
+                        &head_repo,
+                        &pull.head_ref_name,
+                        &pull.head_ref_oid,
+                        &merge_oid,
+                    )
+                    .is_err()
             {
                 info!(
                     "unable to update pr #{} in-place. maintainer_can_modify: {}",
                     pull.number, pull.maintainer_can_modify
                 );
 
-                // XXX Add a config for this
-                //if force_update_in_place {
-                if false {
-                    pull.update_status(Status::InReview, config.repo(), github, project_board)
-                        .await?;
+                pull.update_status(Status::InReview, config.repo(), github, project_board)
+                    .await?;
 
-                    let comment = format!(
-                        ":exclamation: failed to update PR in-place; halting merge.\n\
-                        Make sure that that [\"Allow edits from maintainers\"]\
-                        (https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/allowing-changes-to-a-pull-request-branch-created-from-a-fork) \
-                        is enabled before attempting to reland this PR.");
+                let comment = format!(
+                    ":exclamation: failed to update PR in-place; halting merge.\n\
+                    Make sure that that [\"Allow edits from maintainers\"]\
+                    (https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/allowing-changes-to-a-pull-request-branch-created-from-a-fork) \
+                    is enabled before attempting to reland this PR.");
 
-                    github
-                        .issues()
-                        .create_comment(
-                            config.repo().owner(),
-                            config.repo().name(),
-                            pull.number,
-                            &comment,
-                        )
-                        .await?;
+                github
+                    .issues()
+                    .create_comment(
+                        config.repo().owner(),
+                        config.repo().name(),
+                        pull.number,
+                        &comment,
+                    )
+                    .await?;
 
-                    return Ok(());
-                }
-            };
+                return Ok(());
+            }
         }
 
         // Finally 'merge' the PR by updating the 'base_ref' with `merge_oid`

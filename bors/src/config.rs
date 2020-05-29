@@ -85,6 +85,10 @@ impl RepoConfig {
         self.require_review
     }
 
+    pub fn maintainer_mode(&self) -> bool {
+        self.maintainer_mode
+    }
+
     pub fn checks(&self) -> impl Iterator<Item = &str> {
         let checks = self.checks.iter().map(|(_app, check)| check.name.as_ref());
         let status = self

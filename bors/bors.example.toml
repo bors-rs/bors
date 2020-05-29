@@ -23,6 +23,9 @@ name = ""
 # Require an approving Github review before a PR can be landed
 # require-review = true
 
+# Enforce that maintainer-mode is used so that PRs are updated in-place before merging
+# maintainer-mode = true
+
 # Time that bors will wait before giving up on CI completing
 # timeout-sections = <seconds>
 
