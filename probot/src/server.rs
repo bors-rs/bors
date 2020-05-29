@@ -170,7 +170,27 @@ impl Server {
             return Ok(());
         }
 
-        let event = webhook.to_event()?;
+        let event = match webhook.to_event() {
+            Ok(webhook) => webhook,
+            Err(_err) => {
+                let pretty_json = serde_json::to_string_pretty(
+                    &serde_json::from_slice::<serde_json::Value>(&webhook.body).unwrap(),
+                )
+                .unwrap();
+                warn!(
+                    "Webhook could not be Deserialized: {:?}",
+                    github::Event::from_json(webhook.event_type, pretty_json.as_bytes())
+                        .unwrap_err()
+                );
+                warn!("EventType: {:?}", webhook.event_type);
+                let path = format!("{}.json", webhook.delivery_id);
+                warn!("JSON written to: {}", path);
+                //warn!("Pretty Printed JSON: {}", pretty_json);
+                std::fs::write(path, pretty_json.as_bytes()).unwrap();
+                return Ok(());
+            }
+        };
+
         for service in self.services.iter() {
             if service.route(webhook.event_type) {
                 service.handle(&event, &webhook.delivery_id).await;
