@@ -9,7 +9,7 @@ use crate::{
     Config, Result,
 };
 use futures::{channel::mpsc, sink::SinkExt, stream::StreamExt};
-use github::{Event, EventType, NodeId};
+use github::{Event, EventType, NodeId, PullRequestReviewEvent};
 use log::{error, info, warn};
 use std::collections::HashMap;
 
@@ -134,31 +134,7 @@ impl EventProcessor {
                     .await?
                 }
             }
-            Event::PullRequestReview(e) => {
-                let pr_number = e.pull_request.number;
-                if let Some(pr) = self.pulls.get_mut(&pr_number) {
-                    pr.approved = self
-                        .github
-                        .get_review_decision(
-                            self.config.repo().owner(),
-                            self.config.repo().name(),
-                            pr_number,
-                        )
-                        .await?;
-                }
-
-                if e.action.is_submitted() {
-                    self.process_review(&e.sender.login, e.pull_request.number, &e.review)
-                        .await?;
-                    self.process_comment(
-                        &e.sender.login,
-                        e.pull_request.number,
-                        e.review.body(),
-                        &e.review.node_id,
-                    )
-                    .await?
-                }
-            }
+            Event::PullRequestReview(e) => self.handle_pull_request_review_event(e).await?,
             Event::PullRequestReviewComment(e) => {
                 if e.action.is_created() {
                     self.process_comment(
@@ -403,18 +379,27 @@ impl EventProcessor {
         Ok(())
     }
 
-    async fn process_review(
-        &mut self,
-        sender: &str,
-        pr_number: u64,
-        review: &github::Review,
-    ) -> Result<()> {
-        if let Some(command) = Command::from_review(review) {
-            let mut ctx = self.command_context(sender, pr_number).unwrap();
-            // Check if the user is authorized before executing the command
-            if command.is_authorized(&ctx).await? {
-                command.execute(&mut ctx).await?;
-            }
+    async fn handle_pull_request_review_event(&mut self, e: &PullRequestReviewEvent) -> Result<()> {
+        let pr_number = e.pull_request.number;
+        if let Some(pr) = self.pulls.get_mut(&pr_number) {
+            pr.approved = self
+                .github
+                .get_review_decision(
+                    self.config.repo().owner(),
+                    self.config.repo().name(),
+                    pr_number,
+                )
+                .await?;
+        }
+
+        if e.action.is_submitted() {
+            self.process_comment(
+                &e.sender.login,
+                e.pull_request.number,
+                e.review.body(),
+                &e.review.node_id,
+            )
+            .await?
         }
 
         Ok(())
@@ -481,6 +466,7 @@ impl<'a> CommandContext<'a> {
         &self.pull_request
     }
 
+    #[allow(unused)]
     pub fn pr_mut(&mut self) -> &mut PullRequestState {
         &mut self.pull_request
     }
@@ -497,6 +483,7 @@ impl<'a> CommandContext<'a> {
         &self.sender
     }
 
+    #[allow(unused)]
     pub fn sender_is_author(&self) -> bool {
         if let Some(author) = &self.pull_request.author {
             author == self.sender

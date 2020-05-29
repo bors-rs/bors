@@ -16,7 +16,6 @@ pub struct Command {
 
 #[derive(Debug)]
 enum CommandType {
-    Approve(Approve),
     Land(Land),
     Retry(Retry),
     Cancel,
@@ -27,7 +26,6 @@ enum CommandType {
 impl CommandType {
     fn name(&self) -> &'static str {
         match &self {
-            CommandType::Approve(_) => "Approve",
             CommandType::Land(_) => "Land",
             CommandType::Retry(_) => "Retry",
             CommandType::Cancel => "Cancel",
@@ -112,7 +110,6 @@ impl Command {
         });
 
         let command_type = match command_name {
-            "approve" | "lgtm" | "r+" => CommandType::Approve(Approve::with_args(args)?),
             "land" | "merge" => CommandType::Land(Land::with_args(args)?),
             "retry" => CommandType::Retry(Retry::with_args(args)?),
             "cancel" | "stop" => CommandType::Cancel,
@@ -123,20 +120,6 @@ impl Command {
         };
 
         Ok(command_type)
-    }
-
-    pub fn from_review(review: &github::Review) -> Option<Command> {
-        let command_type = match review.state {
-            github::ReviewState::Approved => CommandType::Approve(Approve::new()),
-            github::ReviewState::ChangesRequested => return None,
-            github::ReviewState::Commented => return None,
-            github::ReviewState::Dismissed => return None,
-        };
-
-        Some(Command {
-            cmd: "FROM REVIEW".to_owned(),
-            command_type,
-        })
     }
 
     /// Display help information for Commands, formatted for use in Github comments
@@ -161,16 +144,6 @@ impl Command {
             reason = Some("Not Collaborator");
         }
 
-        // Check to see if the user issuing the command is attempting to approve their own PR
-        if is_authorized
-            && !ctx.config().allow_self_review()
-            && ctx.sender_is_author()
-            && matches!(self.command_type, CommandType::Approve(_))
-        {
-            is_authorized = false;
-            reason = Some("Can't approve your own PR");
-        }
-
         // Post a comment to Github if there was a reason why the user wasn't authorized
         if !is_authorized {
             if let Some(reason) = reason {
@@ -190,16 +163,6 @@ impl Command {
         info!("Executing command '{}'", self.command_type.name());
 
         match &self.command_type {
-            CommandType::Approve(a) => {
-                if let Some(priority) = a.priority() {
-                    Self::set_priority(&mut ctx, priority).await?;
-                }
-                if let Some(squash) = a.squash {
-                    Self::set_squash(&mut ctx, squash).await?;
-                }
-
-                Self::approve_pr(&mut ctx, false).await?;
-            }
             CommandType::Land(l) => {
                 if let Some(priority) = l.priority() {
                     Self::set_priority(&mut ctx, priority).await?;
@@ -208,7 +171,6 @@ impl Command {
                     Self::set_squash(&mut ctx, squash).await?;
                 }
 
-                Self::approve_pr(&mut ctx, true).await?;
                 Self::mark_pr_ready_to_land(&mut ctx).await?;
             }
             CommandType::Retry(r) => {
@@ -252,48 +214,19 @@ impl Command {
         Ok(())
     }
 
-    async fn approve_pr(ctx: &mut CommandContext<'_>, is_land_command: bool) -> Result<()> {
-        // Skip adding approval if author matches the "reviewer"
-        if !ctx.config().allow_self_review() && ctx.sender_is_author() {
-            return Ok(());
-        }
-
-        // Skip adding approval on draft PRs
-        if ctx.pr().is_draft() {
-            ctx.create_pr_comment(
-                ":clipboard: Looks like this PR is still in progress, ignoring approval",
-            )
-            .await?;
-            return Ok(());
-        }
-
-        info!("#{}: approved by '{}'", ctx.pr().number, ctx.sender());
-
-        let reviewer = ctx.sender().to_owned();
-        if ctx.pr_mut().approved_by.insert(reviewer) {
-            // The approval was added
-            let msg = format!(
-                ":pushpin: Commit {:7} has been approved by `{}`",
-                ctx.pr().head_ref_oid,
-                ctx.sender()
-            );
-            ctx.create_pr_comment(&msg).await?;
-        } else if !is_land_command {
-            // 'reviewer' had already approved the PR
-            let msg = format!(
-                "@{} :bulb: You have already approved this PR, no need to approve it again",
-                ctx.sender()
-            );
-            ctx.create_pr_comment(&msg).await?;
-        }
-
-        Ok(())
-    }
-
     async fn mark_pr_ready_to_land(ctx: &mut CommandContext<'_>) -> Result<()> {
         use crate::state::Status;
 
         info!("attempting to mark pr #{} ReadyToLand", ctx.pr().number);
+
+        // Skip marking for land on draft PRs
+        if ctx.pr().is_draft() {
+            ctx.create_pr_comment(
+                ":clipboard: Looks like this PR is still in progress, unable to queue for landing",
+            )
+            .await?;
+            return Ok(());
+        }
 
         match ctx.pr().status {
             Status::InReview => {
@@ -354,10 +287,6 @@ impl std::fmt::Display for Help {
         )?;
         writeln!(
             f,
-            "- __Approve__ `approve`, `lgtm`, `r+`: add your approval to a PR"
-        )?;
-        writeln!(
-            f,
             "- __Land__ `land`, `merge`: attempt to land or merge a PR"
         )?;
         writeln!(
@@ -373,52 +302,6 @@ impl std::fmt::Display for Help {
 
         writeln!(f)?;
         writeln!(f, "</details>")
-    }
-}
-
-#[derive(Debug)]
-struct Approve {
-    priority: Option<Priority>,
-    squash: Option<bool>,
-}
-
-impl Approve {
-    fn new() -> Self {
-        Self {
-            priority: None,
-            squash: None,
-        }
-    }
-
-    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
-    where
-        I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
-    {
-        let mut priority = None;
-        let mut squash = None;
-
-        for (key, value) in iter {
-            match key {
-                "p" | "priority" => {
-                    priority = Some(Priority::from_arg(value)?);
-                }
-                "squash+" => {
-                    squash = Some(true);
-                }
-                "squash-" => {
-                    squash = Some(false);
-                }
-
-                // First key we hit that we don't understand we should just bail
-                _ => break,
-            }
-        }
-
-        Ok(Self { priority, squash })
-    }
-
-    fn priority(&self) -> Option<u32> {
-        self.priority.as_ref().map(Priority::priority)
     }
 }
 
