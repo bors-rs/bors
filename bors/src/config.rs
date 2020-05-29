@@ -44,9 +44,9 @@ pub struct RepoConfig {
     #[serde(flatten)]
     repo: Repo,
 
-    /// Indicates if authors are allowed to self-review PRs
+    /// Indicates if an approving Github review is required
     #[serde(default)]
-    allow_self_review: bool,
+    require_review: bool,
 
     /// Indicates if bors should use maintainer_mode and push directly to the PR
     #[serde(default)]
@@ -81,8 +81,8 @@ impl RepoConfig {
         &self.repo.name()
     }
 
-    pub fn allow_self_review(&self) -> bool {
-        self.allow_self_review
+    pub fn require_review(&self) -> bool {
+        self.require_review
     }
 
     pub fn checks(&self) -> impl Iterator<Item = &str> {

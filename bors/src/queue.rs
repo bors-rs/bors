@@ -256,8 +256,8 @@ impl MergeQueue {
                     config.repo().name(),
                     pull.number,
                     &format!(
-                        ":sunny: Tests Passed\nApproved by: {:?}\nPushing {} to {}...",
-                        pull.approved_by, merge_oid, pull.base_ref_name
+                        ":sunny: Tests Passed\nPushing {} to {}...",
+                        merge_oid, pull.base_ref_name
                     ),
                 )
                 .await?;

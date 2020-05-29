@@ -230,7 +230,7 @@ impl Command {
 
         match ctx.pr().status {
             Status::InReview => {
-                if ctx.pr().approved || ctx.config().allow_self_review() {
+                if ctx.pr().approved || !ctx.config().require_review() {
                     ctx.update_pr_status(Status::Queued).await?;
                     info!("pr #{} queued for landing", ctx.pr().number);
                 } else {
