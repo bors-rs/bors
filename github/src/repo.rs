@@ -84,7 +84,7 @@ pub struct Repository {
 pub struct Author {
     pub name: String,
     pub email: String,
-    pub username: String,
+    pub username: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
