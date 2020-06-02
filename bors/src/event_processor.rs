@@ -243,6 +243,40 @@ impl EventProcessor {
                     }
                 }
             }
+            PullRequestEventAction::ConvertedToDraft => {
+                if let Some(pull) = self.pulls.get_mut(&event.pull_request.number) {
+                    pull.is_draft = true;
+                }
+            }
+            PullRequestEventAction::ReadyForReview => {
+                if let Some(pull) = self.pulls.get_mut(&event.pull_request.number) {
+                    pull.is_draft = false;
+                }
+            }
+            PullRequestEventAction::Edited => {
+                // TODO maybe factor this out and run it on every PullRequestEvent type
+                // Update PR state from Webhook
+                if let Some(pull) = self.pulls.get_mut(&event.pull_request.number) {
+                    if event.pull_request.title != pull.title {
+                        pull.title = event.pull_request.title.clone();
+                    }
+                    let body = event.pull_request.body.as_deref().unwrap_or("");
+                    if body != pull.body {
+                        pull.body = body.to_owned();
+                    }
+                    if !matches!(pull.status, Status::Testing { .. }) {
+                        if event.pull_request.base.git_ref != pull.base_ref_name {
+                            pull.base_ref_name = event.pull_request.base.git_ref.clone();
+                        }
+                    }
+                    if event.pull_request.base.sha != pull.base_ref_oid {
+                        pull.base_ref_oid = event.pull_request.base.sha.clone();
+                    }
+                    if let Some(maintainer_can_modify) = event.pull_request.maintainer_can_modify {
+                        pull.maintainer_can_modify = maintainer_can_modify;
+                    }
+                }
+            }
 
             // Do nothing for actions we're not interested in
             _ => {}
