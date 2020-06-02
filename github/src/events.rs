@@ -842,6 +842,7 @@ pub enum PullRequestEventAction {
     Closed,
     Reopened,
     Synchronize,
+    ConvertedToDraft,
     ReadyForReview,
     ReviewRequested,
     ReviewRequestRemoved,
