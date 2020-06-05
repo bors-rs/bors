@@ -17,7 +17,6 @@ pub struct Command {
 #[derive(Debug)]
 enum CommandType {
     Land(Land),
-    Retry(Retry),
     Cancel,
     Help,
     Priority(Priority),
@@ -27,7 +26,6 @@ impl CommandType {
     fn name(&self) -> &'static str {
         match &self {
             CommandType::Land(_) => "Land",
-            CommandType::Retry(_) => "Retry",
             CommandType::Cancel => "Cancel",
             CommandType::Help => "Help",
             CommandType::Priority(_) => "Priority",
@@ -111,7 +109,6 @@ impl Command {
 
         let command_type = match command_name {
             "land" | "merge" => CommandType::Land(Land::with_args(args)?),
-            "retry" => CommandType::Retry(Retry::with_args(args)?),
             "cancel" | "stop" => CommandType::Cancel,
             "help" | "h" => CommandType::Help,
             "priority" => CommandType::Priority(Priority::with_args(args)?),
@@ -172,12 +169,6 @@ impl Command {
                 }
 
                 Self::mark_pr_ready_to_land(&mut ctx).await?;
-            }
-            CommandType::Retry(r) => {
-                if let Some(priority) = r.priority() {
-                    Self::set_priority(&mut ctx, priority).await?;
-                }
-                unimplemented!();
             }
             CommandType::Cancel => Self::cancel_land(ctx).await?,
             CommandType::Help => {
@@ -311,10 +302,6 @@ impl std::fmt::Display for Help<'_> {
         )?;
         writeln!(
             f,
-            "| __Retry__ | `retry` | attempt to retry the last action (usually a land/merge) |"
-        )?;
-        writeln!(
-            f,
             "| __Cancel__ | `cancel`, `stop` | stop an in-progress land |"
         )?;
         writeln!(f, "| __Help__ | `help`, `h` | show this help message |")?;
@@ -391,37 +378,6 @@ impl Land {
         }
 
         Ok(Self { priority, squash })
-    }
-
-    fn priority(&self) -> Option<u32> {
-        self.priority.as_ref().map(Priority::priority)
-    }
-}
-
-#[derive(Debug)]
-struct Retry {
-    priority: Option<Priority>,
-}
-
-impl Retry {
-    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
-    where
-        I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
-    {
-        let mut priority = None;
-
-        for (key, value) in iter {
-            match key {
-                "p" | "priority" => {
-                    priority = Some(Priority::from_arg(value)?);
-                }
-
-                // First key we hit that we don't understand we should just bail
-                _ => break,
-            }
-        }
-
-        Ok(Self { priority })
     }
 
     fn priority(&self) -> Option<u32> {
