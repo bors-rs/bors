@@ -92,11 +92,11 @@ impl MergeQueue {
                 pull.update_status(Status::InReview, config.repo(), github, project_board)
                     .await?;
 
-                let comment = format!(
+                let comment =
                     ":exclamation: failed to update PR in-place; halting merge.\n\
                     Make sure that that [\"Allow edits from maintainers\"]\
                     (https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/allowing-changes-to-a-pull-request-branch-created-from-a-fork) \
-                    is enabled before attempting to reland this PR.");
+                    is enabled before attempting to reland this PR.";
 
                 github
                     .issues()
@@ -245,20 +245,6 @@ impl MergeQueue {
             .map(|name| test_results.get(name))
             .all(|result| result.map(|r| r.passed).unwrap_or(false))
         {
-            // Report the Success
-            github
-                .issues()
-                .create_comment(
-                    config.repo().owner(),
-                    config.repo().name(),
-                    pull.number,
-                    &format!(
-                        ":sunny: Tests Passed\nPushing {} to {}...",
-                        merge_oid, pull.base_ref_name
-                    ),
-                )
-                .await?;
-
             // Create github status/check on the merge commit
             github
                 .repos()
