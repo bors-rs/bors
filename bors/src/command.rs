@@ -1,6 +1,6 @@
 //! Defines commands which can be asked to be performed
 
-use crate::{event_processor::CommandContext, Result};
+use crate::{config::RepoConfig, event_processor::CommandContext, Result};
 use log::info;
 use thiserror::Error;
 
@@ -123,8 +123,8 @@ impl Command {
     }
 
     /// Display help information for Commands, formatted for use in Github comments
-    pub fn help() -> impl std::fmt::Display {
-        Help
+    pub fn help<'a>(config: &'a RepoConfig) -> impl std::fmt::Display + 'a {
+        Help::new(config)
     }
 
     pub async fn is_authorized(&self, ctx: &CommandContext<'_>) -> Result<bool> {
@@ -180,7 +180,10 @@ impl Command {
                 unimplemented!();
             }
             CommandType::Cancel => Self::cancel_land(ctx).await?,
-            CommandType::Help => ctx.create_pr_comment(&Help.to_string()).await?,
+            CommandType::Help => {
+                ctx.create_pr_comment(&Help::new(ctx.config()).to_string())
+                    .await?
+            }
             CommandType::Priority(p) => Self::set_priority(&mut ctx, p.priority()).await?,
         }
 
@@ -270,10 +273,21 @@ impl Command {
     }
 }
 
-struct Help;
+struct Help<'a> {
+    config: &'a RepoConfig,
+    // project_board: Option<&'a ProjectBoard>,
+}
 
-impl std::fmt::Display for Help {
+impl<'a> Help<'a> {
+    fn new(config: &'a RepoConfig) -> Self {
+        Self { config }
+    }
+}
+
+impl std::fmt::Display for Help<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        const NON_BREAKING_SPACE: &str = "&nbsp;";
+
         writeln!(f, "<details>")?;
         write!(f, "<summary>")?;
         write!(f, "Bors commands and options")?;
@@ -281,23 +295,63 @@ impl std::fmt::Display for Help {
         writeln!(f, "<br />")?;
         writeln!(f)?;
 
+        //
+        // Commands
+        //
+        writeln!(f, "### Commands")?;
         writeln!(
             f,
-            "Bors actions can be triggered by posting a comment of the form `/<action>`:"
+            "Bors actions can be triggered by posting a comment which includes a line of the form `/<action>`."
+        )?;
+        writeln!(f, "| Command | Action | Description |")?;
+        writeln!(f, "| --- | --- | --- |")?;
+        writeln!(
+            f,
+            "| __Land__ | `land`, `merge` | attempt to land or merge a PR |"
         )?;
         writeln!(
             f,
-            "- __Land__ `land`, `merge`: attempt to land or merge a PR"
+            "| __Retry__ | `retry` | attempt to retry the last action (usually a land/merge) |"
         )?;
         writeln!(
             f,
-            "- __Retry__ `retry`: attempt to retry the last action (usually a land/merge)"
+            "| __Cancel__ | `cancel`, `stop` | stop an in-progress land |"
         )?;
-        writeln!(f, "- __Cancel__ `cancel`, `stop`: stop an in-progress land")?;
-        writeln!(f, "- __Help__ `help`, `h`: show this help message")?;
+        writeln!(f, "| __Help__ | `help`, `h` | show this help message |")?;
         writeln!(
             f,
-            "- __Priority__ `priority`: set the priority level for a PR"
+            "| __Priority__ | `priority` | set the priority level for a PR |"
+        )?;
+        writeln!(f)?;
+
+        //
+        // Options
+        //
+        writeln!(f, "### Options")?;
+        writeln!(
+            f,
+            "Options for Pull Requests are configured through the application of labels.",
+        )?;
+
+        writeln!(
+            f,
+            "| {align}Option{align} | Description |",
+            align = NON_BREAKING_SPACE.repeat(10)
+        )?;
+        writeln!(f, "| --- | --- |")?;
+        writeln!(
+            f,
+            "| ![label: {name}](https://img.shields.io/static/v1?label=&message={name}&color=lightgrey) | {desc} |",
+            name = self.config.labels().high_priority(),
+            desc = "Indicates that the PR is high-priority. \
+            When queued the PR will be placed at the head of the merge queue.",
+        )?;
+        writeln!(
+            f,
+            "| ![label: {name}](https://img.shields.io/static/v1?label=&message={name}&color=lightgrey) | {desc} |",
+            name = self.config.labels().squash(),
+            desc = "Before merging the PR will be squashed down to a single commit, \
+            only retaining the commit message of the first commit in the PR.",
         )?;
 
         writeln!(f)?;

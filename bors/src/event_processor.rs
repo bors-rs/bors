@@ -402,7 +402,10 @@ impl EventProcessor {
                         self.config.repo().owner(),
                         self.config.repo().name(),
                         pr_number,
-                        &format!(":exclamation: Invalid command\n\n{}", Command::help()),
+                        &format!(
+                            ":exclamation: Invalid command\n\n{}",
+                            Command::help(self.config.repo())
+                        ),
                     )
                     .await?;
             }
