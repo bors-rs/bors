@@ -27,6 +27,7 @@ impl SmeeClient {
         // If there are any errors with the stream, log and restart the client
         while let Err(e) = self.run().await {
             warn!("Smee Error: {:?}", e);
+            tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
         }
 
         Ok(())
