@@ -1,6 +1,8 @@
 //! Defines commands which can be asked to be performed
 
-use crate::{config::RepoConfig, event_processor::CommandContext, Result};
+use crate::{
+    config::RepoConfig, event_processor::CommandContext, project_board::ProjectBoard, Result,
+};
 use log::info;
 use thiserror::Error;
 
@@ -120,8 +122,11 @@ impl Command {
     }
 
     /// Display help information for Commands, formatted for use in Github comments
-    pub fn help<'a>(config: &'a RepoConfig) -> impl std::fmt::Display + 'a {
-        Help::new(config)
+    pub fn help<'a>(
+        config: &'a RepoConfig,
+        project_board: Option<&'a ProjectBoard>,
+    ) -> impl std::fmt::Display + 'a {
+        Help::new(config, project_board)
     }
 
     pub async fn is_authorized(&self, ctx: &CommandContext<'_>) -> Result<bool> {
@@ -172,7 +177,7 @@ impl Command {
             }
             CommandType::Cancel => Self::cancel_land(ctx).await?,
             CommandType::Help => {
-                ctx.create_pr_comment(&Help::new(ctx.config()).to_string())
+                ctx.create_pr_comment(&Help::new(ctx.config(), ctx.project_board()).to_string())
                     .await?
             }
             CommandType::Priority(p) => Self::set_priority(&mut ctx, p.priority()).await?,
@@ -266,12 +271,15 @@ impl Command {
 
 struct Help<'a> {
     config: &'a RepoConfig,
-    // project_board: Option<&'a ProjectBoard>,
+    project_board: Option<&'a ProjectBoard>,
 }
 
 impl<'a> Help<'a> {
-    fn new(config: &'a RepoConfig) -> Self {
-        Self { config }
+    fn new(config: &'a RepoConfig, project_board: Option<&'a ProjectBoard>) -> Self {
+        Self {
+            config,
+            project_board,
+        }
     }
 }
 
@@ -281,10 +289,61 @@ impl std::fmt::Display for Help<'_> {
 
         writeln!(f, "<details>")?;
         write!(f, "<summary>")?;
-        write!(f, "Bors commands and options")?;
+        write!(f, "Bors help and documentation")?;
         writeln!(f, "</summary>")?;
         writeln!(f, "<br />")?;
         writeln!(f)?;
+
+        let queue_link = self.project_board.map(|p| p.board().html_url.as_str());
+        let queue = if let Some(link) = queue_link {
+            format!("[Merge Queue]({})", link)
+        } else {
+            "Merge Queue".to_owned()
+        };
+        writeln!(
+            f,
+            "Bors is a Github App used to manage merging of PRs in order to ensure that CI is always \
+            green. It does so by maintaining a {queue}. Once a PR reaches the head of the Merge \
+            Queue it is rebased on top of the latest version of the PR's `base-branch` (generally \
+            `master`) and then triggers CI. If CI comes back green the PR is then merged into the \
+            `base-branch`. Regardless of the outcome, the next PR is the queue is then processed.",
+            queue = queue,
+        )?;
+        writeln!(f)?;
+
+        //
+        // General
+        //
+        writeln!(f, "### General")?;
+
+        if let Some(link) = queue_link {
+            writeln!(
+                f,
+                "- This project's Merge Queue can be found [here]({}).",
+                link
+            )?;
+        }
+
+        if self.config.require_review() {
+            writeln!(
+                f,
+                "- This project requires PRs to be [Reviewed]\
+                (https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/about-pull-request-reviews) \
+                and Approved before they can be queued for merging.",
+            )?;
+        }
+
+        if self.config.maintainer_mode() {
+            writeln!(
+                f,
+                "- Before PR's can be merged they must be configured with \
+                [\"Allow edits from maintainers\"]\
+                (https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/allowing-changes-to-a-pull-request-branch-created-from-a-fork) \
+                enabled. This is needed for Bors to be able to update PR's in-place \
+                so that Github can properly recognize and mark them as \"merged\" \
+                once they've been merged into the upstream branch.",
+            )?;
+        }
 
         //
         // Commands

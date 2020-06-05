@@ -16,6 +16,10 @@ pub struct ProjectBoard {
 }
 
 impl ProjectBoard {
+    pub fn board(&self) -> &Project {
+        &self.board
+    }
+
     pub async fn move_to_review(
         &self,
         github: &GithubClient,

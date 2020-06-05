@@ -404,7 +404,7 @@ impl EventProcessor {
                         pr_number,
                         &format!(
                             ":exclamation: Invalid command\n\n{}",
-                            Command::help(self.config.repo())
+                            Command::help(self.config.repo(), self.project_board.as_ref())
                         ),
                     )
                     .await?;
@@ -515,6 +515,10 @@ impl<'a> CommandContext<'a> {
 
     pub fn config(&self) -> &RepoConfig {
         &self.config
+    }
+
+    pub fn project_board(&self) -> Option<&'a ProjectBoard> {
+        self.project_board
     }
 
     pub fn sender(&self) -> &str {
