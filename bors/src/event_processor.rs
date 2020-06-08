@@ -115,12 +115,6 @@ impl EventProcessor {
     }
 
     async fn handle_webhook(&mut self, event: Event, delivery_id: String) -> Result<()> {
-        info!(
-            "Handling Webhook: event = '{:?}', id = {}",
-            event.event_type(),
-            delivery_id
-        );
-
         // Verify that the event is from our configured repository
         if !event
             .repository()
@@ -130,6 +124,14 @@ impl EventProcessor {
             warn!("Recieved webhook intended for another repository");
             return Ok(());
         }
+
+        info!(
+            "{}/{} - Handling Webhook: event = '{:?}', id = {}",
+            self.config.owner(),
+            self.config.name(),
+            event.event_type(),
+            delivery_id
+        );
 
         match &event {
             Event::PullRequest(e) => self.handle_pull_request_event(e).await?,
