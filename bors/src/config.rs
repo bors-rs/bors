@@ -8,10 +8,9 @@ use std::{
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    pub github: GithubConfig,
     pub git: GitConfig,
     pub repo: RepoConfig,
-    pub secret: Option<String>,
-    pub github_api_token: String,
 }
 
 impl Config {
@@ -20,12 +19,16 @@ impl Config {
         Ok(toml::from_str(&contents)?)
     }
 
-    pub fn secret(&self) -> Option<&[u8]> {
-        self.secret.as_ref().map(String::as_bytes)
-    }
-
     pub fn repo(&self) -> &RepoConfig {
         &self.repo
+    }
+
+    pub fn git(&self) -> &GitConfig {
+        &self.git
+    }
+
+    pub fn github(&self) -> &GithubConfig {
+        &self.github
     }
 }
 
@@ -37,12 +40,21 @@ pub struct GitConfig {
     pub email: String,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct GithubConfig {
+    pub github_api_token: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RepoConfig {
     /// The repo this config pertains to: (Owner, Name)
     #[serde(flatten)]
     repo: Repo,
+
+    /// The webhook secret configured for this repository
+    secret: Option<String>,
 
     /// Indicates if an approving Github review is required
     #[serde(default)]
@@ -79,6 +91,10 @@ impl RepoConfig {
 
     pub fn name(&self) -> &str {
         &self.repo.name()
+    }
+
+    pub fn secret(&self) -> Option<&str> {
+        self.secret.as_deref()
     }
 
     pub fn require_review(&self) -> bool {

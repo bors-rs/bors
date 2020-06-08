@@ -1,8 +1,6 @@
-# Webhook secret used to verify webhooks originated from Github
-secret = ""
-
+[github]
 # Github API token used for interacting with the Github web API
-github_api_token = ""
+github-api-token = ""
 
 [git]
 
@@ -19,6 +17,9 @@ email = ""
 #   github.com/<owner>/<name>
 owner = ""
 name = ""
+
+# Webhook secret used to verify webhooks originated from Github
+secret = ""
 
 # Require an approving Github review before a PR can be landed
 # require-review = true

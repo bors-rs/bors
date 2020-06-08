@@ -15,7 +15,7 @@ pub struct ServeOptions {
 //TODO Make sure to join and await on all of the JoinHandles of the tasks that get spawned
 pub async fn run_serve(config: Config, options: &ServeOptions) -> Result<()> {
     let mut installation = Installation::new(config.repo().owner(), config.repo().name());
-    if let Some(secret) = &config.secret {
+    if let Some(secret) = config.repo().secret() {
         installation.with_secret(secret);
     }
 

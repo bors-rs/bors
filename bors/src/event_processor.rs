@@ -72,7 +72,7 @@ pub struct EventProcessor {
 impl EventProcessor {
     pub fn new(config: Config) -> Result<(EventProcessorSender, Self)> {
         let (tx, rx) = mpsc::channel(1024);
-        let github = GithubClient::new(&config.github_api_token);
+        let github = GithubClient::new(&config.github().github_api_token);
         let git_repository = GitRepository::from_config(&config)?;
 
         Ok((
