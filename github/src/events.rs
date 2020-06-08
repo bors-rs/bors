@@ -312,6 +312,64 @@ impl Event {
             Event::Watch(_) => EventType::Watch,
         }
     }
+
+    pub fn repository(&self) -> Option<&Repository> {
+        match &self {
+            Event::CheckRun(CheckRunEvent { repository, .. })
+            | Event::CheckSuite(CheckSuiteEvent { repository, .. })
+            | Event::CommitComment(CommitCommentEvent { repository, .. })
+            | Event::ContentReference(ContentReferenceEvent { repository, .. })
+            | Event::Create(CreateEvent { repository, .. })
+            | Event::Delete(DeleteEvent { repository, .. })
+            | Event::DeployKey(DeployKeyEvent { repository, .. })
+            | Event::Deployment(DeploymentEvent { repository, .. })
+            | Event::DeploymentStatus(DeploymentStatusEvent { repository, .. })
+            | Event::Fork(ForkEvent { repository, .. })
+            | Event::Gollum(GollumEvent { repository, .. })
+            | Event::IssueComment(IssueCommentEvent { repository, .. })
+            | Event::Issues(IssueEvent { repository, .. })
+            | Event::Label(LabelEvent { repository, .. })
+            | Event::Member(MemberEvent { repository, .. })
+            | Event::Membership(MembershipEvent { repository, .. })
+            | Event::Meta(MetaEvent { repository, .. })
+            | Event::Milestone(MilestoneEvent { repository, .. })
+            | Event::Package(PackageEvent { repository, .. })
+            | Event::PageBuild(PageBuildEvent { repository, .. })
+            | Event::Ping(PingEvent { repository, .. })
+            | Event::ProjectCard(ProjectCardEvent { repository, .. })
+            | Event::ProjectColumn(ProjectColumnEvent { repository, .. })
+            | Event::Project(ProjectEvent { repository, .. })
+            | Event::Public(PublicEvent { repository, .. })
+            | Event::PullRequest(PullRequestEvent { repository, .. })
+            | Event::PullRequestReview(PullRequestReviewEvent { repository, .. })
+            | Event::PullRequestReviewComment(PullRequestReviewCommentEvent {
+                repository, ..
+            })
+            | Event::Push(PushEvent { repository, .. })
+            | Event::Release(ReleaseEvent { repository, .. })
+            | Event::Repository(RepositoryEvent { repository, .. })
+            | Event::RepositoryDispatch(RepositoryDispatchEvent { repository, .. })
+            | Event::RepositoryImport(RepositoryImportEvent { repository, .. })
+            | Event::RepositoryVulnerabilityAlert(RepositoryVulnerabilityAlertEvent {
+                repository,
+                ..
+            })
+            | Event::Star(StarEvent { repository, .. })
+            | Event::Status(StatusEvent { repository, .. })
+            | Event::TeamAdd(TeamAddEvent { repository, .. })
+            | Event::Watch(WatchEvent { repository, .. }) => Some(&repository),
+
+            Event::Installation(_)
+            | Event::InstallationRepositories(_)
+            | Event::MarketplacePurchase(_)
+            | Event::Organization(_)
+            | Event::OrgBlock(_)
+            | Event::GithubAppAuthorization(_)
+            | Event::SecurityAdvisory(_)
+            | Event::Sponsorship(_)
+            | Event::Team(_) => None,
+        }
+    }
 }
 
 /// The Action performed by a `CheckRunEvent`
