@@ -11,7 +11,8 @@ ssh-key-file = ""
 user = ""
 email = ""
 
-[repo]
+# An array of repository configs
+[[repo]]
 
 # Identify which repository is being managed:
 #   github.com/<owner>/<name>

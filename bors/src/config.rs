@@ -10,7 +10,7 @@ use std::{
 pub struct Config {
     pub github: GithubConfig,
     pub git: GitConfig,
-    pub repo: RepoConfig,
+    pub repo: Vec<RepoConfig>,
 }
 
 impl Config {

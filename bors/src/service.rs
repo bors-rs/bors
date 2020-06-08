@@ -17,16 +17,18 @@ pub async fn run_serve(config: Config, options: &ServeOptions) -> Result<()> {
     let Config { repo, github, git } = config;
     let mut builder = Server::builder();
 
-    let mut installation = Installation::new(repo.owner(), repo.name());
-    if let Some(secret) = repo.secret() {
-        installation.with_secret(secret);
+    for repo in repo {
+        let mut installation = Installation::new(repo.owner(), repo.name());
+        if let Some(secret) = repo.secret() {
+            installation.with_secret(secret);
+        }
+
+        let (tx, event_processor) = EventProcessor::new(repo, &github, &git)?;
+        tokio::spawn(event_processor.start());
+        installation.with_service(Box::new(tx));
+
+        builder.add_installation(installation);
     }
-
-    let (tx, event_processor) = EventProcessor::new(repo, &github, &git)?;
-    tokio::spawn(event_processor.start());
-    installation.with_service(Box::new(tx));
-
-    builder.add_installation(installation);
 
     if let Some(smee_uri) = &options.smee {
         builder.smee(Some(smee_uri.clone()));
