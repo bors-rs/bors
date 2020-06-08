@@ -18,18 +18,6 @@ impl Config {
         let contents = fs::read_to_string(path)?;
         Ok(toml::from_str(&contents)?)
     }
-
-    pub fn repo(&self) -> &RepoConfig {
-        &self.repo
-    }
-
-    pub fn git(&self) -> &GitConfig {
-        &self.git
-    }
-
-    pub fn github(&self) -> &GithubConfig {
-        &self.github
-    }
 }
 
 #[derive(Clone, Debug, Deserialize)]

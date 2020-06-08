@@ -1,12 +1,12 @@
 use crate::{
     command::Command,
-    config::RepoConfig,
+    config::{GitConfig, GithubConfig, RepoConfig},
     git::GitRepository,
     graphql::GithubClient,
     project_board::ProjectBoard,
     queue::MergeQueue,
     state::{PullRequestState, Status},
-    Config, Result,
+    Result,
 };
 use futures::{channel::mpsc, sink::SinkExt, stream::StreamExt};
 use github::{Event, EventType, NodeId, PullRequestReviewEvent};
@@ -60,7 +60,7 @@ impl probot::Service for EventProcessorSender {
 
 #[derive(Debug)]
 pub struct EventProcessor {
-    config: Config,
+    config: RepoConfig,
     github: GithubClient,
     git_repository: GitRepository,
     merge_queue: MergeQueue,
@@ -70,10 +70,14 @@ pub struct EventProcessor {
 }
 
 impl EventProcessor {
-    pub fn new(config: Config) -> Result<(EventProcessorSender, Self)> {
+    pub fn new(
+        config: RepoConfig,
+        github_config: &GithubConfig,
+        git_config: &GitConfig,
+    ) -> Result<(EventProcessorSender, Self)> {
         let (tx, rx) = mpsc::channel(1024);
-        let github = GithubClient::new(&config.github().github_api_token);
-        let git_repository = GitRepository::from_config(&config)?;
+        let github = GithubClient::new(&github_config.github_api_token);
+        let git_repository = GitRepository::from_config(git_config, config.repo())?;
 
         Ok((
             EventProcessorSender::new(tx),
@@ -180,10 +184,10 @@ impl EventProcessor {
                 let pr_is_from_base_repo = state
                     .head_repo
                     .as_ref()
-                    .map(|repo| self.config.repo().repo() == repo)
+                    .map(|repo| self.config.repo() == repo)
                     .unwrap_or(false);
 
-                if self.config.repo().maintainer_mode()
+                if self.config.maintainer_mode()
                     && !state.maintainer_can_modify
                     && !pr_is_from_base_repo
                 {
@@ -362,7 +366,7 @@ impl EventProcessor {
             Some(CommandContext {
                 pull_request: pr,
                 github: &self.github,
-                config: self.config.repo(),
+                config: &self.config,
                 project_board: self.project_board.as_ref(),
                 sender,
             })
@@ -404,7 +408,7 @@ impl EventProcessor {
                         pr_number,
                         &format!(
                             ":exclamation: Invalid command\n\n{}",
-                            Command::help(self.config.repo(), self.project_board.as_ref())
+                            Command::help(&self.config, self.project_board.as_ref())
                         ),
                     )
                     .await?;
@@ -467,9 +471,9 @@ impl EventProcessor {
         .await?;
 
         // Ensure all labels exist
-        let owner = self.config.repo().owner();
-        let name = self.config.repo().name();
-        for label in self.config.repo().labels().all() {
+        let owner = self.config.owner();
+        let name = self.config.name();
+        for label in self.config.labels().all() {
             if self
                 .github
                 .issues()

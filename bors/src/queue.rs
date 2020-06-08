@@ -1,9 +1,10 @@
 use crate::{
+    config::RepoConfig,
     git::GitRepository,
     graphql::GithubClient,
     project_board::ProjectBoard,
     state::{PullRequestState, Status},
-    Config, Result,
+    Result,
 };
 use log::info;
 use std::{
@@ -50,7 +51,7 @@ impl MergeQueue {
 
     async fn land_pr(
         &mut self,
-        config: &Config,
+        config: &RepoConfig,
         github: &GithubClient,
         repo: &mut GitRepository,
         project_board: Option<&ProjectBoard>,
@@ -74,7 +75,7 @@ impl MergeQueue {
             // commits that are to be imminently merged using the `maintainer_can_modify` feature.
             // This is done so that when the commits are finally pushed to the base ref that Github
             // will properly mark the PR as being 'merged'.
-            if config.repo().maintainer_mode()
+            if config.maintainer_mode()
                 && repo
                     .push_to_remote(
                         &head_repo,
@@ -89,7 +90,7 @@ impl MergeQueue {
                     pull.number, pull.maintainer_can_modify
                 );
 
-                pull.update_status(Status::InReview, config.repo(), github, project_board)
+                pull.update_status(Status::InReview, config, github, project_board)
                     .await?;
 
                 let comment =
@@ -100,12 +101,7 @@ impl MergeQueue {
 
                 github
                     .issues()
-                    .create_comment(
-                        config.repo().owner(),
-                        config.repo().name(),
-                        pull.number,
-                        &comment,
-                    )
+                    .create_comment(config.owner(), config.name(), pull.number, &comment)
                     .await?;
 
                 return Ok(());
@@ -116,8 +112,8 @@ impl MergeQueue {
         github
             .git()
             .update_ref(
-                config.repo().owner(),
-                config.repo().name(),
+                config.owner(),
+                config.name(),
                 &format!("heads/{}", pull.base_ref_name),
                 &merge_oid,
                 false,
@@ -136,7 +132,7 @@ impl MergeQueue {
 
     pub async fn process_queue(
         &mut self,
-        config: &Config,
+        config: &RepoConfig,
         github: &GithubClient,
         repo: &mut GitRepository,
         project_board: Option<&ProjectBoard>,
@@ -159,7 +155,7 @@ impl MergeQueue {
 
     async fn process_head(
         &mut self,
-        config: &Config,
+        config: &RepoConfig,
         github: &GithubClient,
         repo: &mut GitRepository,
         project_board: Option<&ProjectBoard>,
@@ -197,14 +193,13 @@ impl MergeQueue {
 
         // Check if there were any test failures from configured checks
         if let Some((name, result)) = config
-            .repo()
             .checks()
             .filter_map(|name| test_results.get(name).map(|result| (name, result.clone())))
             .find(|(_name, result)| !result.passed)
         {
             // Remove the PR from the Queue
             // XXX Maybe mark as "Failed"?
-            pull.update_status(Status::InReview, config.repo(), github, project_board)
+            pull.update_status(Status::InReview, config, github, project_board)
                 .await?;
             self.head.take();
 
@@ -212,8 +207,8 @@ impl MergeQueue {
             github
                 .repos()
                 .create_status(
-                    config.repo().owner(),
-                    config.repo().name(),
+                    config.owner(),
+                    config.name(),
                     &pull.head_ref_oid.to_string(),
                     &github::client::CreateStatusRequest {
                         state: github::StatusEventState::Failure,
@@ -228,8 +223,8 @@ impl MergeQueue {
             github
                 .issues()
                 .create_comment(
-                    config.repo().owner(),
-                    config.repo().name(),
+                    config.owner(),
+                    config.name(),
                     pull.number,
                     &format!(
                         ":broken_heart: Test Failed - [{}]({})",
@@ -240,7 +235,6 @@ impl MergeQueue {
 
         // Check if all tests have completed and passed
         } else if config
-            .repo()
             .checks()
             .map(|name| test_results.get(name))
             .all(|result| result.map(|r| r.passed).unwrap_or(false))
@@ -249,8 +243,8 @@ impl MergeQueue {
             github
                 .repos()
                 .create_status(
-                    config.repo().owner(),
-                    config.repo().name(),
+                    config.owner(),
+                    config.name(),
                     &merge_oid.to_string(),
                     &github::client::CreateStatusRequest {
                         state: github::StatusEventState::Success,
@@ -265,20 +259,20 @@ impl MergeQueue {
                 .await?;
 
         // Check if the test has timed-out
-        } else if tests_started_at.elapsed() >= config.repo().timeout() {
+        } else if tests_started_at.elapsed() >= config.timeout() {
             info!("PR #{} timed-out", pull.number);
 
             // Remove the PR from the Queue
             // XXX Maybe mark as "Failed"?
-            pull.update_status(Status::InReview, config.repo(), github, project_board)
+            pull.update_status(Status::InReview, config, github, project_board)
                 .await?;
             self.head = None;
 
             github
                 .repos()
                 .create_status(
-                    config.repo().owner(),
-                    config.repo().name(),
+                    config.owner(),
+                    config.name(),
                     &pull.head_ref_oid.to_string(),
                     &github::client::CreateStatusRequest {
                         state: github::StatusEventState::Failure,
@@ -293,8 +287,8 @@ impl MergeQueue {
             github
                 .issues()
                 .create_comment(
-                    config.repo().owner(),
-                    config.repo().name(),
+                    config.owner(),
+                    config.name(),
                     pull.number,
                     &format!(":boom: Tests timed-out"),
                 )
@@ -306,7 +300,7 @@ impl MergeQueue {
 
     async fn process_next_head(
         &mut self,
-        config: &Config,
+        config: &RepoConfig,
         github: &GithubClient,
         repo: &mut GitRepository,
         project_board: Option<&ProjectBoard>,
@@ -321,7 +315,7 @@ impl MergeQueue {
             .collect();
         queue.sort_unstable_by_key(|p| QueueEntry {
             number: p.number,
-            priority: p.has_label(config.repo().labels().high_priority()),
+            priority: p.has_label(config.labels().high_priority()),
         });
         let mut queue = queue.into_iter();
 
@@ -335,26 +329,21 @@ impl MergeQueue {
                 &pull.head_ref_oid,
                 "auto",
                 pull.number,
-                pull.has_label(config.repo().labels().squash()),
+                pull.has_label(config.labels().squash()),
             )? {
                 repo.push_branch("auto")?;
                 info!("pushed 'auto' branch");
 
-                pull.update_status(
-                    Status::testing(merge_oid),
-                    config.repo(),
-                    github,
-                    project_board,
-                )
-                .await?;
+                pull.update_status(Status::testing(merge_oid), config, github, project_board)
+                    .await?;
                 self.head = Some(pull.number);
 
                 // Create github status
                 github
                     .repos()
                     .create_status(
-                        config.repo().owner(),
-                        config.repo().name(),
+                        config.owner(),
+                        config.name(),
                         &pull.head_ref_oid.to_string(),
                         &github::client::CreateStatusRequest {
                             state: github::StatusEventState::Pending,
@@ -365,14 +354,14 @@ impl MergeQueue {
                     )
                     .await?;
             } else {
-                pull.update_status(Status::InReview, config.repo(), github, project_board)
+                pull.update_status(Status::InReview, config, github, project_board)
                     .await?;
 
                 github
                     .repos()
                     .create_status(
-                        config.repo().owner(),
-                        config.repo().name(),
+                        config.owner(),
+                        config.name(),
                         &pull.head_ref_oid.to_string(),
                         &github::client::CreateStatusRequest {
                             state: github::StatusEventState::Error,
@@ -386,8 +375,8 @@ impl MergeQueue {
                 github
                     .issues()
                     .create_comment(
-                        config.repo().owner(),
-                        config.repo().name(),
+                        config.owner(),
+                        config.name(),
                         pull.number,
                         ":lock: Merge Conflict",
                     )

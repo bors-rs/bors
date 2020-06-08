@@ -1,4 +1,4 @@
-use crate::{graphql::GithubClient, state::PullRequestState, Config, Result};
+use crate::{config::RepoConfig, graphql::GithubClient, state::PullRequestState, Result};
 use github::{Project, ProjectColumn};
 use std::collections::HashMap;
 
@@ -93,7 +93,7 @@ impl ProjectBoard {
 
     pub async fn synchronize_or_init(
         github: &GithubClient,
-        config: &Config,
+        config: &RepoConfig,
         open_pulls: &mut HashMap<u64, PullRequestState>,
     ) -> Result<Self> {
         let board = Self::create_or_get_project_board(github, config).await?;
@@ -120,12 +120,12 @@ impl ProjectBoard {
 
     async fn create_or_get_project_board(
         github: &GithubClient,
-        config: &Config,
+        config: &RepoConfig,
     ) -> Result<github::Project> {
         let mut project_board = None;
         for project in github
             .projects()
-            .list_for_repo(config.repo().owner(), config.repo().name(), None)
+            .list_for_repo(config.owner(), config.name(), None)
             .await?
             .into_inner()
         {
@@ -140,7 +140,7 @@ impl ProjectBoard {
         } else {
             github
                 .projects()
-                .create_for_repo(config.repo().owner(), config.repo().name(), "bors", None)
+                .create_for_repo(config.owner(), config.name(), "bors", None)
                 .await?
                 .into_inner()
         };

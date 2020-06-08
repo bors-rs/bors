@@ -1,4 +1,4 @@
-use crate::{config::GitConfig, state::Repo, Config, Result};
+use crate::{config::GitConfig, state::Repo, Result};
 use anyhow::{anyhow, Context};
 use github::Oid;
 use log::info;
@@ -17,9 +17,9 @@ pub struct GitRepository {
 }
 
 impl GitRepository {
-    pub fn from_config(config: &Config) -> Result<Self> {
-        let github_repo = config.repo().repo().clone();
-        let git_config = config.git.clone();
+    pub fn from_config(git_config: &GitConfig, repo: &Repo) -> Result<Self> {
+        let github_repo = repo.clone();
+        let git_config = git_config.clone();
         let mut directory = std::env::current_dir()?;
         directory.push(REPOS_DIR);
         directory.push(github_repo.owner());
