@@ -121,7 +121,16 @@ impl EventProcessor {
             delivery_id
         );
 
-        //TODO route on the request
+        // Verify that the event is from our configured repository
+        if !event
+            .repository()
+            .map(|r| r.owner.login == self.config.owner() && r.name == self.config.name())
+            .unwrap_or(false)
+        {
+            warn!("Recieved webhook intended for another repository");
+            return Ok(());
+        }
+
         match &event {
             Event::PullRequest(e) => self.handle_pull_request_event(e).await?,
             Event::CheckRun(e) => self.handle_check_run_event(e),
