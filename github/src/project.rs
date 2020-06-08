@@ -24,7 +24,7 @@ pub struct ProjectCard {
     pub node_id: NodeId,
     pub url: String,
     pub column_url: String,
-    pub content_url: String,
+    pub content_url: Option<String>,
     pub note: Option<String>,
     pub creator: User,
     pub created_at: DateTime,
@@ -33,6 +33,7 @@ pub struct ProjectCard {
 
     // populated by Webhook events
     pub column_id: Option<u64>,
+    pub after_id: Option<u64>,
 
     // Populated by Events API
     pub project_id: Option<u64>,
@@ -51,7 +52,11 @@ impl ProjectCard {
             return None;
         }
 
-        self.content_url.split('/').last()?.parse().ok()
+        if let Some(url) = &self.content_url {
+            url.split('/').last()?.parse().ok()
+        } else {
+            None
+        }
     }
 }
 
