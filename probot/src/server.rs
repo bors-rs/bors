@@ -30,13 +30,13 @@ pub struct ServerBuilder {
 }
 
 impl ServerBuilder {
-    pub fn smee(mut self, smee_url: Option<String>) -> Self {
+    pub fn smee(&mut self, smee_url: Option<String>) -> &mut Self {
         self.smee = true;
         self.smee_url = smee_url;
         self
     }
 
-    pub fn add_installation(mut self, installation: Installation) -> Self {
+    pub fn add_installation(&mut self, installation: Installation) -> &mut Self {
         self.installations.push(installation);
         self
     }

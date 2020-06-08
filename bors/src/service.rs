@@ -15,6 +15,7 @@ pub struct ServeOptions {
 //TODO Make sure to join and await on all of the JoinHandles of the tasks that get spawned
 pub async fn run_serve(config: Config, options: &ServeOptions) -> Result<()> {
     let Config { repo, github, git } = config;
+    let mut builder = Server::builder();
 
     let mut installation = Installation::new(repo.owner(), repo.name());
     if let Some(secret) = repo.secret() {
@@ -25,12 +26,13 @@ pub async fn run_serve(config: Config, options: &ServeOptions) -> Result<()> {
     tokio::spawn(event_processor.start());
     installation.with_service(Box::new(tx));
 
-    let mut builder = Server::builder();
+    builder.add_installation(installation);
+
     if let Some(smee_uri) = &options.smee {
-        builder = builder.smee(Some(smee_uri.clone()));
+        builder.smee(Some(smee_uri.clone()));
     }
 
     let addr = ([127, 0, 0, 1], options.port).into();
-    builder.add_installation(installation).serve(addr).await?;
+    builder.serve(addr).await?;
     Ok(())
 }
