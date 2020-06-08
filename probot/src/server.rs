@@ -1,4 +1,4 @@
-use crate::{service::Service, smee_client::SmeeClient, Error, Result};
+use crate::{installation::Installation, smee_client::SmeeClient, Error, Result};
 use futures::{
     future::{self, FutureExt, TryFutureExt},
     try_join,
@@ -26,9 +26,7 @@ pub struct ServerBuilder {
     smee: bool,
     /// smee.io URL
     smee_url: Option<String>,
-    /// Github Secret
-    secret: Option<String>,
-    services: Vec<Box<dyn Service>>,
+    installations: Vec<Installation>,
 }
 
 impl ServerBuilder {
@@ -38,19 +36,14 @@ impl ServerBuilder {
         self
     }
 
-    pub fn add_service(mut self, service: Box<dyn Service>) -> Self {
-        self.services.push(service);
-        self
-    }
-
-    pub fn secret(mut self, secret: String) -> Self {
-        self.secret = Some(secret);
+    pub fn add_installation(mut self, installation: Installation) -> Self {
+        self.installations.push(installation);
         self
     }
 
     pub async fn serve(self, addr: SocketAddr) -> Result<()> {
         // Construct the server
-        let server = Server::new(self.services, self.secret);
+        let server = Server::new(self.installations);
 
         // The closure inside `make_service_fn` is run for each connection,
         // creating a 'service' to handle requests for that specific connection.
@@ -94,10 +87,8 @@ impl ServerBuilder {
 #[derive(Clone, Debug)]
 pub struct Server {
     counter: Arc<AtomicUsize>,
-    /// Services
-    services: Arc<Vec<Box<dyn Service>>>,
-    /// Github Secret
-    secret: Option<String>,
+    /// Installations which contain various services
+    installations: Arc<Vec<Installation>>,
 }
 
 impl Server {
@@ -105,11 +96,10 @@ impl Server {
         ServerBuilder::default()
     }
 
-    fn new(services: Vec<Box<dyn Service>>, secret: Option<String>) -> Self {
+    fn new(installations: Vec<Installation>) -> Self {
         Self {
             counter: Arc::new(AtomicUsize::new(0)),
-            services: Arc::new(services),
-            secret,
+            installations: Arc::new(installations),
         }
     }
 
@@ -163,13 +153,7 @@ impl Server {
     pub(super) async fn handle_webhook(&mut self, webhook: Webhook) -> Result<()> {
         info!("Handling Webhook: {}", webhook.delivery_id);
 
-        if webhook.check_signature(self.secret.as_deref().map(str::as_bytes)) {
-            info!("Signature check PASSED!");
-        } else {
-            warn!("Signature check FAILED! Skipping Event.");
-            return Ok(());
-        }
-
+        // Convert the webhook to an event so that we can get out the installation information
         let event = match webhook.to_event() {
             Ok(webhook) => webhook,
             Err(_err) => {
@@ -192,11 +176,26 @@ impl Server {
             }
         };
 
-        for service in self.services.iter() {
-            if service.route(webhook.event_type) {
-                service.handle(&event, &webhook.delivery_id).await;
+        // XXX Right now we only handle Webhook installations for Repositories
+        if let Some(installation) = event.repository().and_then(|repository| {
+            self.installations
+                .iter()
+                .find(|i| i.owner() == repository.owner.login && i.name() == repository.name)
+        }) {
+            if webhook.check_signature(installation.secret().map(str::as_bytes)) {
+                info!("Signature check PASSED!");
+            } else {
+                warn!("Signature check FAILED! Skipping Event.");
+                return Ok(());
+            }
+
+            for service in installation.services() {
+                if service.route(webhook.event_type) {
+                    service.handle(&event, &webhook.delivery_id).await;
+                }
             }
         }
+
         Ok(())
     }
 }
@@ -256,7 +255,7 @@ mod test {
         static PAYLOAD: &str = include_str!("../test-input/pull-request-event-payload");
         let request = request_from_raw_http(PAYLOAD);
 
-        let mut service = Server::new(vec![], None);
+        let mut service = Server::new(vec![]);
 
         let resp = service.route_github(request).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
