@@ -34,7 +34,7 @@ pub async fn run_serve(config: Config, options: &ServeOptions) -> Result<()> {
         builder.smee(Some(smee_uri.clone()));
     }
 
-    let addr = ([127, 0, 0, 1], options.port).into();
+    let addr = ([0, 0, 0, 0], options.port).into();
     builder.serve(addr).await?;
     Ok(())
 }
