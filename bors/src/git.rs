@@ -1,7 +1,7 @@
 use crate::{config::GitConfig, state::Repo, Result};
 use anyhow::{anyhow, Context};
 use github::Oid;
-use log::info;
+use log::{debug, info};
 use std::{
     path::{Path, PathBuf},
     process::Command,
@@ -212,13 +212,18 @@ impl Git {
         let output = self.inner.output()?;
 
         if !output.status.success() {
-            return Err(anyhow!(
-                "failed to run git command:\n{}",
-                String::from_utf8_lossy(&output.stderr)
-            ));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            debug!("Git command failed:\n$ {:?}\n{}", self.inner, stderr);
+            return Err(anyhow!("failed to run git command:\n{}", stderr));
         }
 
-        Ok(String::from_utf8(output.stdout)?)
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        debug!(
+            "Git command run successfully:\n$ {:?}\n{}",
+            self.inner, stdout
+        );
+
+        Ok(stdout.into())
     }
 
     pub fn is_git_repo(mut self) -> Result<bool> {
