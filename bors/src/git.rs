@@ -320,7 +320,7 @@ impl Git {
     pub fn push_branch(mut self, branch: &str, force: bool) -> Result<()> {
         self.inner.args(&["push", "origin"]);
         if force {
-            self.inner.arg("--force-with-lease");
+            self.inner.arg("--force");
         }
         self.inner.arg(branch);
         self.run()?;
