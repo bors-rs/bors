@@ -1,5 +1,5 @@
 use super::{Event, EventType};
-use log::{debug, warn};
+use log::{trace, warn};
 
 /// The GitHub header key used to pass the event type
 ///
@@ -31,8 +31,8 @@ impl Webhook {
                 let hash = hex::encode(hmacsha1::hmac_sha1(key, &self.body));
                 let signature = &signature["sha1=".len()..];
 
-                debug!("hash: {}", hash);
-                debug!("sig:  {}", signature);
+                trace!("hash: {}", hash);
+                trace!("sig:  {}", signature);
                 hash == signature
             }
             // We are expecting a signature and we either recieved it in a different format than

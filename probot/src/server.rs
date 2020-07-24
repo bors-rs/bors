@@ -11,7 +11,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server as HyperServer, StatusCode,
 };
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use std::{
     net::SocketAddr,
     sync::{
@@ -48,8 +48,6 @@ impl ServerBuilder {
         // The closure inside `make_service_fn` is run for each connection,
         // creating a 'service' to handle requests for that specific connection.
         let make_service = make_service_fn(|socket: &AddrStream| {
-            info!("remote address: {:?}", socket.remote_addr());
-
             // While the state was moved into the make_service closure,
             // we need to clone it here because this closure is called
             // once for every connection.
@@ -139,7 +137,7 @@ impl Server {
             }
         };
 
-        info!("{:#?}", webhook.event_type);
+        debug!("{:#?}", webhook.event_type);
         self.handle_webhook(webhook).await?;
 
         Ok(Response::builder()
@@ -151,7 +149,7 @@ impl Server {
 
     //TODO maybe insert into database here
     pub(super) async fn handle_webhook(&mut self, webhook: Webhook) -> Result<()> {
-        info!("Handling Webhook: {}", webhook.delivery_id);
+        debug!("Handling Webhook: {}", webhook.delivery_id);
 
         // Convert the webhook to an event so that we can get out the installation information
         let event = match webhook.to_event() {
@@ -182,9 +180,7 @@ impl Server {
                 .iter()
                 .find(|i| i.owner() == repository.owner.login && i.name() == repository.name)
         }) {
-            if webhook.check_signature(installation.secret().map(str::as_bytes)) {
-                info!("Signature check PASSED!");
-            } else {
+            if !webhook.check_signature(installation.secret().map(str::as_bytes)) {
                 warn!("Signature check FAILED! Skipping Event.");
                 return Ok(());
             }

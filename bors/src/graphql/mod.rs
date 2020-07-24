@@ -9,6 +9,7 @@
 use crate::{state::PullRequestState, Result};
 use github::{client::Response, Client, NodeId, ReactionType};
 use graphql_client::GraphQLQuery;
+use log::debug;
 use std::ops::Deref;
 
 mod query;
@@ -96,6 +97,8 @@ impl GithubClient {
         });
 
         let response: ResponseData = self.0.graphql().query(&q).await?.into_inner();
+
+        debug!("get_review_decision #{}: {:#?}", number, response);
 
         let d = response
             .repository
