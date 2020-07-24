@@ -229,6 +229,20 @@ impl Command {
 
         match ctx.pr().status {
             Status::InReview => {
+                // double check the approval on the PR
+                if ctx.config().require_review() && !ctx.pr().approved {
+                    let approved = ctx
+                        .github()
+                        .get_review_decision(
+                            ctx.config().repo().owner(),
+                            ctx.config().repo().name(),
+                            ctx.pr().number,
+                        )
+                        .await?;
+
+                    ctx.pr_mut().approved = approved;
+                }
+
                 if ctx.pr().approved || !ctx.config().require_review() {
                     ctx.update_pr_status(Status::Queued).await?;
                     info!("pr #{} queued for landing", ctx.pr().number);
