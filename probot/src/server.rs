@@ -47,7 +47,7 @@ impl ServerBuilder {
 
         // The closure inside `make_service_fn` is run for each connection,
         // creating a 'service' to handle requests for that specific connection.
-        let make_service = make_service_fn(|socket: &AddrStream| {
+        let make_service = make_service_fn(|_socket: &AddrStream| {
             // While the state was moved into the make_service closure,
             // we need to clone it here because this closure is called
             // once for every connection.
