@@ -137,7 +137,7 @@ impl Server {
     async fn route_repos(&mut self, request: Request<Body>) -> Result<Response<Body>> {
         let path = request.uri().path();
 
-        if path == "/repos" {
+        if path == "/repos" || path == "/repos/" {
             let mut body = String::new();
             body.push_str("Repositories:\n\n");
 
@@ -147,8 +147,6 @@ impl Server {
                     installation.owner(),
                     installation.name()
                 ));
-
-                body.push_str(&format!("{:#?}\n", installation.config()));
             }
 
             return Ok(Response::new(Body::from(body)));
@@ -161,7 +159,7 @@ impl Server {
                 repo = installation.name()
             );
 
-            if path == &route[..route.len() - 1] || path.starts_with(&route) {
+            if path == &route[..route.len() - 1] || path == route {
                 let body = format!(
                     "{}/{}\n\nConfig:\n{:#?}\n\nState:\n{}",
                     installation.owner(),
@@ -169,7 +167,11 @@ impl Server {
                     installation.config(),
                     installation.state().await,
                 );
+
                 return Ok(Response::new(Body::from(body)));
+            } else if path.starts_with(&route) && path.ends_with("/sync") {
+                installation.sync().await;
+                return Ok(Response::new(Body::from("Syncing Pull Requests!")));
             }
         }
 

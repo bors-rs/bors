@@ -49,6 +49,10 @@ impl MergeQueue {
         Self { head: None }
     }
 
+    pub fn reset(&mut self) {
+        self.head = None;
+    }
+
     async fn land_pr(
         &mut self,
         config: &RepoConfig,

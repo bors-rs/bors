@@ -48,4 +48,8 @@ impl Installation {
 
         format!("Queue: {:#?}\n\nPulls: {:#?}", queue, pulls)
     }
+
+    pub async fn sync(&self) {
+        self.event_processor.sync().await.unwrap();
+    }
 }

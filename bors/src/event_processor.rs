@@ -22,6 +22,7 @@ use std::collections::HashMap;
 pub enum Request {
     Webhook { event: Event, delivery_id: String },
     GetState(oneshot::Sender<(MergeQueue, HashMap<u64, PullRequestState>)>),
+    Synchronize,
 }
 
 #[derive(Clone, Debug)]
@@ -47,6 +48,10 @@ impl EventProcessorSender {
         let (tx, rx) = oneshot::channel();
         self.inner.clone().send(Request::GetState(tx)).await?;
         Ok(rx.await.unwrap())
+    }
+
+    pub async fn sync(&self) -> Result<(), mpsc::SendError> {
+        self.inner.clone().send(Request::Synchronize).await
     }
 }
 
@@ -107,6 +112,8 @@ impl EventProcessor {
                     .send((self.merge_queue.clone(), self.pulls.clone()))
                     .unwrap();
             }
+
+            Synchronize => self.synchronize().await?,
         }
 
         Ok(())
@@ -470,6 +477,7 @@ impl EventProcessor {
         self.pulls.clear();
         self.pulls
             .extend(pulls.into_iter().map(|pr| (pr.number, pr)));
+        self.merge_queue.reset();
 
         // Sync and reset project board
         let board = crate::project_board::ProjectBoard::synchronize_or_init(
