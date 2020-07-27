@@ -188,20 +188,18 @@ impl PullRequestState {
         details_url: &str,
         conclusion: github::Conclusion,
     ) {
-        match self.status {
-            Status::Testing {
-                ref mut test_results,
-                ..
-            } => {
-                test_results.insert(
-                    build_name.to_owned(),
-                    TestResult {
-                        details_url: details_url.to_owned(),
-                        passed: matches!(conclusion, github::Conclusion::Success),
-                    },
-                );
-            }
-            _ => {}
+        if let Status::Testing {
+            ref mut test_results,
+            ..
+        } = self.status
+        {
+            test_results.insert(
+                build_name.to_owned(),
+                TestResult {
+                    details_url: details_url.to_owned(),
+                    passed: matches!(conclusion, github::Conclusion::Success),
+                },
+            );
         }
     }
 }

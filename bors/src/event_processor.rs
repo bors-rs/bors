@@ -190,11 +190,11 @@ impl EventProcessor {
                             self.config.repo().owner(),
                             self.config.repo().name(),
                             state.number,
-                            &format!(":exclamation: before this PR can be merged please make sure that you enable \
+                            ":exclamation: before this PR can be merged please make sure that you enable \
                             [\"Allow edits from maintainers\"]\
                             (https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/allowing-changes-to-a-pull-request-branch-created-from-a-fork).\n\n\
                             This is needed for tooling to be able to update this PR in-place so that Github can \
-                            properly recognize and mark it as merged once its merged into the upstream branch"),
+                            properly recognize and mark it as merged once its merged into the upstream branch",
                         )
                         .await?;
                 }
@@ -261,10 +261,10 @@ impl EventProcessor {
                     if body != pull.body {
                         pull.body = body.to_owned();
                     }
-                    if !matches!(pull.status, Status::Testing { .. }) {
-                        if event.pull_request.base.git_ref != pull.base_ref_name {
-                            pull.base_ref_name = event.pull_request.base.git_ref.clone();
-                        }
+                    if !matches!(pull.status, Status::Testing { .. })
+                        && event.pull_request.base.git_ref != pull.base_ref_name
+                    {
+                        pull.base_ref_name = event.pull_request.base.git_ref.clone();
                     }
                     if event.pull_request.base.sha != pull.base_ref_oid {
                         pull.base_ref_oid = event.pull_request.base.sha.clone();

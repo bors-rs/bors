@@ -297,6 +297,7 @@ impl<'a> Help<'a> {
     }
 }
 
+#[allow(clippy::write_literal)]
 impl std::fmt::Display for Help<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         const NON_BREAKING_SPACE: &str = "&nbsp;";
@@ -486,7 +487,7 @@ impl Priority {
         } else {
             // No value specified
             //TODO better error message
-            return Err(ParseCommnadError);
+            Err(ParseCommnadError)
         }
     }
 

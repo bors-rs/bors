@@ -226,6 +226,7 @@ impl Git {
         Ok(stdout.into())
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn is_git_repo(mut self) -> Result<bool> {
         let output = self
             .inner

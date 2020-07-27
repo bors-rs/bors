@@ -14,6 +14,7 @@ impl NodeId {
 pub struct Oid(String);
 
 impl Oid {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str<S: Into<String>>(s: S) -> Self {
         Oid(s.into())
     }

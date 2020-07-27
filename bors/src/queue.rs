@@ -290,7 +290,7 @@ impl MergeQueue {
                     config.owner(),
                     config.name(),
                     pull.number,
-                    &format!(":boom: Tests timed-out"),
+                    ":boom: Tests timed-out",
                 )
                 .await?;
         }
