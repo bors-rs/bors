@@ -3,38 +3,23 @@ use crate::{
     git::GitRepository,
     graphql::GithubClient,
     project_board::ProjectBoard,
-    state::{PullRequestState, Status},
+    state::{Priority, PullRequestState, Status},
     Result,
 };
 use log::info;
-use std::{
-    cmp::{Ordering, Reverse},
-    collections::HashMap,
-};
+use std::collections::HashMap;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
 struct QueueEntry {
+    /// Indicates the priority of the PR
+    priority: Priority,
+
     number: u64,
-
-    /// Indicates if the PR is high priority or not
-    priority: bool,
 }
 
-impl PartialOrd for QueueEntry {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match Reverse(self.priority).cmp(&Reverse(other.priority)) {
-            Ordering::Equal => Some(self.number.cmp(&other.number)),
-            ord => Some(ord),
-        }
-    }
-}
-
-impl Ord for QueueEntry {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match Reverse(self.priority).cmp(&Reverse(other.priority)) {
-            Ordering::Equal => self.number.cmp(&other.number),
-            ord => ord,
-        }
+impl QueueEntry {
+    fn new(number: u64, priority: Priority) -> Self {
+        Self { number, priority }
     }
 }
 
@@ -317,10 +302,7 @@ impl MergeQueue {
             .map(|(_n, p)| p)
             .filter(|p| p.status.is_queued())
             .collect();
-        queue.sort_unstable_by_key(|p| QueueEntry {
-            number: p.number,
-            priority: p.has_label(config.labels().high_priority()),
-        });
+        queue.sort_unstable_by_key(|p| QueueEntry::new(p.number, p.priority(config)));
         let mut queue = queue.into_iter();
 
         while let (None, Some(pull)) = (self.head, queue.next()) {
@@ -389,5 +371,52 @@ impl MergeQueue {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn priority_sort() {
+        let mut entries = vec![
+            QueueEntry::new(1, Priority::Normal),
+            QueueEntry::new(10, Priority::High),
+        ];
+
+        entries.sort();
+
+        let expected = vec![
+            QueueEntry::new(10, Priority::High),
+            QueueEntry::new(1, Priority::Normal),
+        ];
+        assert_eq!(entries, expected);
+
+        let mut entries = vec![
+            QueueEntry::new(10, Priority::Normal),
+            QueueEntry::new(1, Priority::Normal),
+        ];
+
+        entries.sort();
+
+        let expected = vec![
+            QueueEntry::new(1, Priority::Normal),
+            QueueEntry::new(10, Priority::Normal),
+        ];
+        assert_eq!(entries, expected);
+
+        let mut entries = vec![
+            QueueEntry::new(1, Priority::Low),
+            QueueEntry::new(10, Priority::Normal),
+        ];
+
+        entries.sort();
+
+        let expected = vec![
+            QueueEntry::new(10, Priority::Normal),
+            QueueEntry::new(1, Priority::Low),
+        ];
+        assert_eq!(entries, expected);
     }
 }

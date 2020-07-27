@@ -1,7 +1,11 @@
 use crate::{config::RepoConfig, graphql::GithubClient, project_board::ProjectBoard, Result};
 use github::Oid;
 use serde::Deserialize;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
+use thiserror::Error;
 
 #[derive(Clone, Debug)]
 pub struct PullRequestState {
@@ -165,6 +169,16 @@ impl PullRequestState {
         self.labels.contains(label)
     }
 
+    pub fn priority(&self, config: &RepoConfig) -> Priority {
+        if self.has_label(config.labels().high_priority()) {
+            Priority::High
+        } else if self.has_label(config.labels().low_priority()) {
+            Priority::Low
+        } else {
+            Priority::Normal
+        }
+    }
+
     pub async fn remove_label(
         &mut self,
         config: &RepoConfig,
@@ -200,6 +214,29 @@ impl PullRequestState {
                     passed: matches!(conclusion, github::Conclusion::Success),
                 },
             );
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Ord, Eq)]
+pub enum Priority {
+    High,
+    Normal,
+    Low,
+}
+
+#[derive(Error, Debug)]
+#[error("invalid priority")]
+pub struct ParsePriorityError;
+
+impl FromStr for Priority {
+    type Err = ParsePriorityError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "high" => Ok(Priority::High),
+            "normal" => Ok(Priority::Normal),
+            "low" => Ok(Priority::Low),
+            _ => Err(ParsePriorityError),
         }
     }
 }

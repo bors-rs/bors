@@ -130,6 +130,7 @@ pub struct StatusConfig {
 pub struct Labels {
     squash: Option<String>,
     high_priority: Option<String>,
+    low_priority: Option<String>,
 }
 
 impl Labels {
@@ -143,8 +144,14 @@ impl Labels {
             .unwrap_or("bors-high-priority")
     }
 
+    pub fn low_priority(&self) -> &str {
+        self.low_priority.as_deref().unwrap_or("bors-low-priority")
+    }
+
     pub fn all(&self) -> impl Iterator<Item = &str> {
         use std::iter::once;
-        once(self.squash()).chain(once(self.high_priority()))
+        once(self.squash())
+            .chain(once(self.high_priority()))
+            .chain(once(self.low_priority()))
     }
 }

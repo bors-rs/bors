@@ -1,7 +1,8 @@
 //! Defines commands which can be asked to be performed
 
 use crate::{
-    config::RepoConfig, event_processor::CommandContext, project_board::ProjectBoard, Result,
+    config::RepoConfig, event_processor::CommandContext, project_board::ProjectBoard,
+    state::Priority, Result,
 };
 use log::info;
 use thiserror::Error;
@@ -21,7 +22,7 @@ enum CommandType {
     Land(Land),
     Cancel,
     Help,
-    Priority(Priority),
+    Priority(PriorityCommand),
 }
 
 impl CommandType {
@@ -113,7 +114,7 @@ impl Command {
             "land" | "merge" => CommandType::Land(Land::with_args(args)?),
             "cancel" | "stop" => CommandType::Cancel,
             "help" | "h" => CommandType::Help,
-            "priority" => CommandType::Priority(Priority::with_args(args)?),
+            "priority" => CommandType::Priority(PriorityCommand::with_args(args)?),
 
             _ => return Err(ParseCommnadError),
         };
@@ -186,14 +187,24 @@ impl Command {
         Ok(())
     }
 
-    async fn set_priority(ctx: &mut CommandContext<'_>, priority: u32) -> Result<()> {
-        info!("#{}: set priority to {}", ctx.pr().number, priority);
+    async fn set_priority(ctx: &mut CommandContext<'_>, priority: Priority) -> Result<()> {
+        info!("#{}: set priority to {:?}", ctx.pr().number, priority);
 
-        let label = ctx.config().labels().high_priority().to_owned();
-        if priority > 0 {
-            ctx.set_label(&label).await?;
-        } else {
-            ctx.remove_label(&label).await?;
+        let high_priority_label = ctx.config().labels().high_priority().to_owned();
+        let low_priority_label = ctx.config().labels().low_priority().to_owned();
+        match priority {
+            Priority::High => {
+                ctx.set_label(&high_priority_label).await?;
+                ctx.remove_label(&low_priority_label).await?;
+            }
+            Priority::Normal => {
+                ctx.remove_label(&high_priority_label).await?;
+                ctx.remove_label(&low_priority_label).await?;
+            }
+            Priority::Low => {
+                ctx.set_label(&low_priority_label).await?;
+                ctx.remove_label(&high_priority_label).await?;
+            }
         }
 
         Ok(())
@@ -381,7 +392,7 @@ impl std::fmt::Display for Help<'_> {
         writeln!(f, "| __Help__ | `help`, `h` | show this help message |")?;
         writeln!(
             f,
-            "| __Priority__ | `priority` | set the priority level for a PR |"
+            "| __Priority__ | `priority` | set the priority level for a PR (`high`, `normal`, `low`) |"
         )?;
         writeln!(f)?;
 
@@ -410,6 +421,13 @@ impl std::fmt::Display for Help<'_> {
         writeln!(
             f,
             "| ![label: {name}](https://img.shields.io/static/v1?label=&message={name}&color=lightgrey) | {desc} |",
+            name = self.config.labels().low_priority(),
+            desc = "Indicates that the PR is low-priority. \
+            When queued the PR will be placed at the back of the merge queue.",
+        )?;
+        writeln!(
+            f,
+            "| ![label: {name}](https://img.shields.io/static/v1?label=&message={name}&color=lightgrey) | {desc} |",
             name = self.config.labels().squash(),
             desc = "Before merging the PR will be squashed down to a single commit, \
             only retaining the commit message of the first commit in the PR.",
@@ -422,7 +440,7 @@ impl std::fmt::Display for Help<'_> {
 
 #[derive(Debug)]
 struct Land {
-    priority: Option<Priority>,
+    priority: Option<PriorityCommand>,
     squash: Option<bool>,
 }
 
@@ -437,7 +455,7 @@ impl Land {
         for (key, value) in iter {
             match key {
                 "p" | "priority" => {
-                    priority = Some(Priority::from_arg(value)?);
+                    priority = Some(PriorityCommand::from_arg(value)?);
                 }
                 "squash+" => {
                     squash = Some(true);
@@ -454,18 +472,17 @@ impl Land {
         Ok(Self { priority, squash })
     }
 
-    fn priority(&self) -> Option<u32> {
-        self.priority.as_ref().map(Priority::priority)
+    fn priority(&self) -> Option<Priority> {
+        self.priority.as_ref().map(PriorityCommand::priority)
     }
 }
 
-// XXX Don't have priority be an integer, it should be a boolean
 #[derive(Debug)]
-struct Priority {
-    priority: u32,
+struct PriorityCommand {
+    priority: Priority,
 }
 
-impl Priority {
+impl PriorityCommand {
     fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
     where
         I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
@@ -491,7 +508,7 @@ impl Priority {
         }
     }
 
-    fn priority(&self) -> u32 {
+    fn priority(&self) -> Priority {
         self.priority
     }
 }
