@@ -38,7 +38,7 @@ impl Ord for QueueEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct MergeQueue {
     /// The current head of the queue, the PR that is currently being tested
     head: Option<u64>,

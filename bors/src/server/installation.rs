@@ -15,6 +15,10 @@ impl Installation {
         }
     }
 
+    pub fn config(&self) -> &RepoConfig {
+        &self.config
+    }
+
     pub fn owner(&self) -> &str {
         self.config.owner()
     }
@@ -34,9 +38,14 @@ impl Installation {
 
     pub async fn handle_webhook(&self, event: &Event, delivery_id: &str) {
         self.event_processor
-            .clone()
             .webhook(event.clone(), delivery_id.to_owned())
             .await
             .unwrap();
+    }
+
+    pub async fn state(&self) -> String {
+        let (queue, pulls) = self.event_processor.get_state().await.unwrap();
+
+        format!("Queue: {:#?}\n\nPulls: {:#?}", queue, pulls)
     }
 }

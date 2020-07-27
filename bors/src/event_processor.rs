@@ -8,7 +8,11 @@ use crate::{
     state::{PullRequestState, Status},
     Result,
 };
-use futures::{channel::mpsc, sink::SinkExt, stream::StreamExt};
+use futures::{
+    channel::{mpsc, oneshot},
+    sink::SinkExt,
+    stream::StreamExt,
+};
 use github::{Event, NodeId, PullRequestReviewEvent};
 use log::{error, info, warn};
 use std::collections::HashMap;
@@ -17,6 +21,7 @@ use std::collections::HashMap;
 #[allow(clippy::large_enum_variant)]
 pub enum Request {
     Webhook { event: Event, delivery_id: String },
+    GetState(oneshot::Sender<(MergeQueue, HashMap<u64, PullRequestState>)>),
 }
 
 #[derive(Clone, Debug)]
@@ -29,14 +34,19 @@ impl EventProcessorSender {
         Self { inner }
     }
 
-    pub async fn webhook(
-        &mut self,
-        event: Event,
-        delivery_id: String,
-    ) -> Result<(), mpsc::SendError> {
+    pub async fn webhook(&self, event: Event, delivery_id: String) -> Result<(), mpsc::SendError> {
         self.inner
+            .clone()
             .send(Request::Webhook { event, delivery_id })
             .await
+    }
+
+    pub async fn get_state(
+        &self,
+    ) -> Result<(MergeQueue, HashMap<u64, PullRequestState>), mpsc::SendError> {
+        let (tx, rx) = oneshot::channel();
+        self.inner.clone().send(Request::GetState(tx)).await?;
+        Ok(rx.await.unwrap())
     }
 }
 
@@ -91,6 +101,12 @@ impl EventProcessor {
         use Request::*;
         match request {
             Webhook { event, delivery_id } => self.handle_webhook(event, delivery_id).await?,
+
+            Request::GetState(oneshot) => {
+                oneshot
+                    .send((self.merge_queue.clone(), self.pulls.clone()))
+                    .unwrap();
+            }
         }
 
         Ok(())

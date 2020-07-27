@@ -124,46 +124,59 @@ impl Server {
                 .status(StatusCode::METHOD_NOT_ALLOWED)
                 .body(Body::empty())?),
             (&Method::POST, "/github") => self.route_github(request).await,
+            (_, route) if route == "/repos" || route.starts_with("/repos/") => {
+                self.route_repos(request).await
+            }
             _ => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .body(Body::empty())?),
         }
     }
 
-    // fn have_route_to_service(&self, path: &str) -> bool {
-    //     for installation in self.installations.iter() {
-    //         let route = format!(
-    //             "/{service}/{owner}/{repo}/",
-    //             service = installation.services()[0].name(),
-    //             owner = installation.owner(),
-    //             repo = installation.name()
-    //         );
+    // XXX Really rough code for dumping internal state
+    async fn route_repos(&mut self, request: Request<Body>) -> Result<Response<Body>> {
+        let path = request.uri().path();
 
-    //         if path == &route[..route.len() - 1] || path.starts_with(&route) {
-    //             return true;
-    //         }
-    //     }
+        if path == "/repos" {
+            let mut body = String::new();
+            body.push_str("Repositories:\n\n");
 
-    //     false
-    // }
+            for installation in self.installations.iter() {
+                body.push_str(&format!(
+                    "{}/{}\n",
+                    installation.owner(),
+                    installation.name()
+                ));
 
-    // async fn route_to_service(&mut self, request: Request<Body>) -> Option<Result<Response<Body>>> {
-    //     for installation in self.installations.iter() {
-    //         let route = format!(
-    //             "/{service}/{owner}/{repo}/",
-    //             service = installation.services()[0].name(),
-    //             owner = installation.owner(),
-    //             repo = installation.name()
-    //         );
+                body.push_str(&format!("{:#?}\n", installation.config()));
+            }
 
-    //         if path == &route[..route.len() - 1] || path.starts_with(&route) {
-    //             return Some(installation.services()[0].http_route(request)
-    //             return true;
-    //         }
-    //     }
+            return Ok(Response::new(Body::from(body)));
+        }
 
-    //     None
-    // }
+        for installation in self.installations.iter() {
+            let route = format!(
+                "/repos/{owner}/{repo}/",
+                owner = installation.owner(),
+                repo = installation.name()
+            );
+
+            if path == &route[..route.len() - 1] || path.starts_with(&route) {
+                let body = format!(
+                    "{}/{}\n\nConfig:\n{:#?}\n\nState:\n{}",
+                    installation.owner(),
+                    installation.name(),
+                    installation.config(),
+                    installation.state().await,
+                );
+                return Ok(Response::new(Body::from(body)));
+            }
+        }
+
+        Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::empty())?)
+    }
 
     async fn route_github(&mut self, request: Request<Body>) -> Result<Response<Body>> {
         assert_eq!(request.method(), &Method::POST);

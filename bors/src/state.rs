@@ -3,7 +3,7 @@ use github::Oid;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PullRequestState {
     pub number: u64,
     pub id: u64,
@@ -38,7 +38,7 @@ pub struct TestResult {
     pub details_url: String,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Status {
     InReview,
     Queued,
