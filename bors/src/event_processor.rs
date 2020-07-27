@@ -9,7 +9,7 @@ use crate::{
     Result,
 };
 use futures::{channel::mpsc, sink::SinkExt, stream::StreamExt};
-use github::{Event, EventType, NodeId, PullRequestReviewEvent};
+use github::{Event, NodeId, PullRequestReviewEvent};
 use log::{error, info, warn};
 use std::collections::HashMap;
 
@@ -37,24 +37,6 @@ impl EventProcessorSender {
         self.inner
             .send(Request::Webhook { event, delivery_id })
             .await
-    }
-}
-
-#[async_trait::async_trait]
-impl probot::Service for EventProcessorSender {
-    fn name(&self) -> &'static str {
-        "bors"
-    }
-
-    fn route(&self, _event_type: EventType) -> bool {
-        true
-    }
-
-    async fn handle(&self, event: &Event, delivery_id: &str) {
-        self.clone()
-            .webhook(event.clone(), delivery_id.to_owned())
-            .await
-            .unwrap();
     }
 }
 

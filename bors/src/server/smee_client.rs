@@ -1,4 +1,5 @@
-use crate::{Result, Server};
+use super::Server;
+use crate::Result;
 use bytes::{Buf, BytesMut};
 use github::{EventType, Webhook};
 use log::{debug, info, warn};

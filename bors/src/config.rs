@@ -34,7 +34,7 @@ pub struct GithubConfig {
     pub github_api_token: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RepoConfig {
     /// The repo this config pertains to: (Owner, Name)
@@ -115,17 +115,17 @@ impl RepoConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct ChecksConfig {
     name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct StatusConfig {
     context: String,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Labels {
     squash: Option<String>,

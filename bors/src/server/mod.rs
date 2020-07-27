@@ -1,4 +1,14 @@
-use crate::{installation::Installation, smee_client::SmeeClient, Error, Result};
+mod installation;
+mod smee_client;
+
+#[cfg(test)]
+mod test;
+
+pub use self::installation::Installation;
+use self::smee_client::SmeeClient;
+
+use crate::{Error, Result};
+use anyhow::anyhow;
 use futures::{
     future::{self, FutureExt, TryFutureExt},
     try_join,
@@ -11,7 +21,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server as HyperServer, StatusCode,
 };
-use log::{debug, error, info, warn};
+use log::{error, info, trace, warn};
 use std::{
     net::SocketAddr,
     sync::{
@@ -20,7 +30,6 @@ use std::{
     },
 };
 
-//TODO Maybe use a config file for common probot like configs (e.g. secret)
 #[derive(Default, Debug)]
 pub struct ServerBuilder {
     smee: bool,
@@ -69,10 +78,8 @@ impl ServerBuilder {
         if let Some(smee_uri) = self.smee_url {
             let smee_client = SmeeClient::with_uri(smee_uri, server.clone());
             //let smee_handle = tokio::spawn(smee_client.start()).map_err(Error::from);
-            let smee_handle = tokio::spawn(smee_client.start()).map(|join_result| {
-                let res = join_result.unwrap();
-                res
-            });
+            let smee_handle =
+                tokio::spawn(smee_client.start()).map(|join_result| join_result.unwrap());
             try_join!(hyper_server, smee_handle)?;
         } else {
             hyper_server.await?;
@@ -123,6 +130,41 @@ impl Server {
         }
     }
 
+    // fn have_route_to_service(&self, path: &str) -> bool {
+    //     for installation in self.installations.iter() {
+    //         let route = format!(
+    //             "/{service}/{owner}/{repo}/",
+    //             service = installation.services()[0].name(),
+    //             owner = installation.owner(),
+    //             repo = installation.name()
+    //         );
+
+    //         if path == &route[..route.len() - 1] || path.starts_with(&route) {
+    //             return true;
+    //         }
+    //     }
+
+    //     false
+    // }
+
+    // async fn route_to_service(&mut self, request: Request<Body>) -> Option<Result<Response<Body>>> {
+    //     for installation in self.installations.iter() {
+    //         let route = format!(
+    //             "/{service}/{owner}/{repo}/",
+    //             service = installation.services()[0].name(),
+    //             owner = installation.owner(),
+    //             repo = installation.name()
+    //         );
+
+    //         if path == &route[..route.len() - 1] || path.starts_with(&route) {
+    //             return Some(installation.services()[0].http_route(request)
+    //             return true;
+    //         }
+    //     }
+
+    //     None
+    // }
+
     async fn route_github(&mut self, request: Request<Body>) -> Result<Response<Body>> {
         assert_eq!(request.method(), &Method::POST);
         assert_eq!(request.uri().path(), "/github");
@@ -137,7 +179,6 @@ impl Server {
             }
         };
 
-        debug!("{:#?}", webhook.event_type);
         self.handle_webhook(webhook).await?;
 
         Ok(Response::builder()
@@ -149,7 +190,7 @@ impl Server {
 
     //TODO maybe insert into database here
     pub(super) async fn handle_webhook(&mut self, webhook: Webhook) -> Result<()> {
-        debug!("Handling Webhook: {}", webhook.delivery_id);
+        trace!("Handling Webhook: {}", webhook.delivery_id);
 
         // Convert the webhook to an event so that we can get out the installation information
         let event = match webhook.to_event() {
@@ -185,11 +226,9 @@ impl Server {
                 return Ok(());
             }
 
-            for service in installation.services() {
-                if service.route(webhook.event_type) {
-                    service.handle(&event, &webhook.delivery_id).await;
-                }
-            }
+            installation
+                .handle_webhook(&event, &webhook.delivery_id)
+                .await;
         }
 
         Ok(())
@@ -200,7 +239,7 @@ async fn webhook_from_request(request: Request<Body>) -> Result<Webhook> {
     // Webhooks from github should only contain json payloads
     match request.headers().get(CONTENT_TYPE).map(HeaderValue::to_str) {
         Some(Ok("application/json")) => {}
-        _ => return Err("unknown content type".into()),
+        _ => return Err(anyhow!("unknown content type")),
     }
 
     let event_type = match request
@@ -210,7 +249,7 @@ async fn webhook_from_request(request: Request<Body>) -> Result<Webhook> {
         .and_then(|s| s.parse::<EventType>().ok())
     {
         Some(event) => event,
-        _ => return Err("missing valid X-GitHub-Event header".into()),
+        _ => return Err(anyhow!("missing valid X-GitHub-Event header")),
     };
 
     let delivery_id = match request
@@ -219,7 +258,7 @@ async fn webhook_from_request(request: Request<Body>) -> Result<Webhook> {
         .and_then(|h| HeaderValue::to_str(h).ok())
     {
         Some(guid) => guid.to_owned(),
-        _ => return Err("missing valid X-GitHub-Delivery header".into()),
+        _ => return Err(anyhow!("missing valid X-GitHub-Delivery header")),
     };
 
     let signature = match request
@@ -239,58 +278,4 @@ async fn webhook_from_request(request: Request<Body>) -> Result<Webhook> {
         signature,
         body,
     })
-}
-
-#[cfg(test)]
-mod test {
-    use super::Server;
-    use hyper::{Body, Method, Request, StatusCode, Uri, Version};
-
-    #[tokio::test]
-    async fn pull_request_event() {
-        static PAYLOAD: &str = include_str!("../test-input/pull-request-event-payload");
-        let request = request_from_raw_http(PAYLOAD);
-
-        let mut service = Server::new(vec![]);
-
-        let resp = service.route_github(request).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        println!("{:?}", resp);
-    }
-
-    // Super quick and dirty parsing of raw http into a `Request<Body>` type.
-    // This assumes that the content is JSON
-    fn request_from_raw_http(raw: &'static str) -> Request<Body> {
-        let (headers, payload) = raw.split_at(raw.find("{\n").unwrap());
-
-        let mut headers = headers.lines();
-        let (method, uri, version) = parse_method_line(headers.next().unwrap());
-        let headers = headers.map(|line| {
-            let (key, value) = line.split_at(line.find(":").unwrap());
-            // remove the ':' from the value
-            (key.trim(), value[1..].trim())
-        });
-
-        let mut request_builder = Request::builder().method(method).uri(uri).version(version);
-        for (key, value) in headers {
-            request_builder = request_builder.header(key, value);
-        }
-
-        request_builder.body(Body::from(payload)).unwrap()
-    }
-
-    fn parse_method_line(line: &str) -> (Method, Uri, Version) {
-        let mut iter = line.split_whitespace();
-
-        let method = iter.next().unwrap().parse().unwrap();
-
-        let uri = iter.next().unwrap().parse().unwrap();
-
-        let version = match iter.next().unwrap() {
-            "HTTP/1.1" => Version::HTTP_11,
-            _ => panic!("unknown version"),
-        };
-
-        (method, uri, version)
-    }
 }

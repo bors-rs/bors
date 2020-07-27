@@ -1,5 +1,8 @@
-use crate::{event_processor::EventProcessor, Config, Result};
-use probot::{Installation, Server};
+use crate::{
+    event_processor::EventProcessor,
+    server::{Installation, Server},
+    Config, Result,
+};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -18,15 +21,10 @@ pub async fn run_serve(config: Config, options: &ServeOptions) -> Result<()> {
     let mut builder = Server::builder();
 
     for repo in repo {
-        let mut installation = Installation::new(repo.owner(), repo.name());
-        if let Some(secret) = repo.secret() {
-            installation.with_secret(secret);
-        }
-
-        let (tx, event_processor) = EventProcessor::new(repo, &github, &git)?;
+        let (tx, event_processor) = EventProcessor::new(repo.clone(), &github, &git)?;
         tokio::spawn(event_processor.start());
-        installation.with_service(Box::new(tx));
 
+        let installation = Installation::new(repo, tx);
         builder.add_installation(installation);
     }
 
