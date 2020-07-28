@@ -2,7 +2,7 @@ use super::Server;
 use crate::Result;
 use bytes::{Buf, BytesMut};
 use github::{EventType, Webhook};
-use log::{debug, info, warn};
+use log::{debug, info, trace, warn};
 use reqwest::{Client, Response};
 use serde::Deserialize;
 use serde_json::value::RawValue;
@@ -49,10 +49,10 @@ impl SmeeClient {
         let mut event_parser = SmeeEventParser::from_body(&mut response);
         while let Some(event) = event_parser.next().await? {
             match event {
-                SmeeEvent::Ready => debug!("ready!"),
-                SmeeEvent::Ping => debug!("ping!"),
+                SmeeEvent::Ready => trace!("ready!"),
+                SmeeEvent::Ping => trace!("ping!"),
                 SmeeEvent::Message(webhook) => {
-                    debug!("message!");
+                    trace!("message!");
                     // Have the server process the webhook
                     self.server.handle_webhook(webhook).await?;
                 }
