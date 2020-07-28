@@ -4,8 +4,7 @@ use super::{
     Team, User,
 };
 use serde::{de, Deserialize, Serialize};
-use std::str::FromStr;
-use thiserror::Error;
+use std::{io, str::FromStr};
 
 #[derive(Clone, Copy, Debug)]
 pub enum EventType {
@@ -62,70 +61,71 @@ pub enum EventType {
     TeamAdd,
     Watch,
     Wildcard,
+
+    // Unknown Webhook event type
+    Unknown,
 }
 
-#[derive(Error, Debug)]
-#[error("invalid github webhook event")]
-pub struct ParseEventTypeError;
-
 impl FromStr for EventType {
-    type Err = ParseEventTypeError;
+    type Err = std::convert::Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use EventType::*;
 
-        match s {
-            "check_run" => Ok(CheckRun),
-            "check_suite" => Ok(CheckSuite),
-            "commit_comment" => Ok(CommitComment),
-            "content_reference" => Ok(ContentReference),
-            "create" => Ok(Create),
-            "delete" => Ok(Delete),
-            "deploy_key" => Ok(DeployKey),
-            "deployment" => Ok(Deployment),
-            "deployment_status" => Ok(DeploymentStatus),
-            "fork" => Ok(Fork),
-            "github_app_authorization" => Ok(GithubAppAuthorization),
-            "gollum" => Ok(Gollum),
-            "installation" => Ok(Installation),
-            "installation_repositories" => Ok(InstallationRepositories),
-            "issue_comment" => Ok(IssueComment),
-            "issues" => Ok(Issues),
-            "label" => Ok(Label),
-            "marketplace_purchase" => Ok(MarketplacePurchase),
-            "member" => Ok(Member),
-            "membership" => Ok(Membership),
-            "meta" => Ok(Meta),
-            "milestone" => Ok(Milestone),
-            "organization" => Ok(Organization),
-            "org_block" => Ok(OrgBlock),
-            "package" => Ok(Package),
-            "page_build" => Ok(PageBuild),
-            "ping" => Ok(Ping),
-            "project_card" => Ok(ProjectCard),
-            "project_column" => Ok(ProjectColumn),
-            "project" => Ok(Project),
-            "public" => Ok(Public),
-            "pull_request" => Ok(PullRequest),
-            "pull_request_review" => Ok(PullRequestReview),
-            "pull_request_review_comment" => Ok(PullRequestReviewComment),
-            "push" => Ok(Push),
-            "registry_package" => Ok(RegistryPackage),
-            "release" => Ok(Release),
-            "repository_dispatch" => Ok(RepositoryDispatch),
-            "repository" => Ok(Repository),
-            "repository_import" => Ok(RepositoryImport),
-            "repository_vulnerability_alert" => Ok(RepositoryVulnerabilityAlert),
-            "security_advisory" => Ok(SecurityAdvisory),
-            "sponsorship" => Ok(Sponsorship),
-            "star" => Ok(Star),
-            "status" => Ok(Status),
-            "team" => Ok(Team),
-            "team_add" => Ok(TeamAdd),
-            "watch" => Ok(Watch),
-            "*" => Ok(Wildcard),
-            _ => Err(ParseEventTypeError),
-        }
+        let event_type = match s {
+            "check_run" => CheckRun,
+            "check_suite" => CheckSuite,
+            "commit_comment" => CommitComment,
+            "content_reference" => ContentReference,
+            "create" => Create,
+            "delete" => Delete,
+            "deploy_key" => DeployKey,
+            "deployment" => Deployment,
+            "deployment_status" => DeploymentStatus,
+            "fork" => Fork,
+            "github_app_authorization" => GithubAppAuthorization,
+            "gollum" => Gollum,
+            "installation" => Installation,
+            "installation_repositories" => InstallationRepositories,
+            "issue_comment" => IssueComment,
+            "issues" => Issues,
+            "label" => Label,
+            "marketplace_purchase" => MarketplacePurchase,
+            "member" => Member,
+            "membership" => Membership,
+            "meta" => Meta,
+            "milestone" => Milestone,
+            "organization" => Organization,
+            "org_block" => OrgBlock,
+            "package" => Package,
+            "page_build" => PageBuild,
+            "ping" => Ping,
+            "project_card" => ProjectCard,
+            "project_column" => ProjectColumn,
+            "project" => Project,
+            "public" => Public,
+            "pull_request" => PullRequest,
+            "pull_request_review" => PullRequestReview,
+            "pull_request_review_comment" => PullRequestReviewComment,
+            "push" => Push,
+            "registry_package" => RegistryPackage,
+            "release" => Release,
+            "repository_dispatch" => RepositoryDispatch,
+            "repository" => Repository,
+            "repository_import" => RepositoryImport,
+            "repository_vulnerability_alert" => RepositoryVulnerabilityAlert,
+            "security_advisory" => SecurityAdvisory,
+            "sponsorship" => Sponsorship,
+            "star" => Star,
+            "status" => Status,
+            "team" => Team,
+            "team_add" => TeamAdd,
+            "watch" => Watch,
+            "*" => Wildcard,
+            _ => Unknown,
+        };
+
+        Ok(event_type)
     }
 }
 
@@ -192,7 +192,7 @@ pub enum Event {
 }
 
 impl Event {
-    pub fn from_json(event_type: EventType, json: &[u8]) -> Result<Self, serde_json::Error> {
+    pub fn from_json(event_type: EventType, json: &[u8]) -> Result<Self, io::Error> {
         let event = match event_type {
             EventType::CheckRun => Event::CheckRun(serde_json::from_slice(json)?),
             EventType::CheckSuite => Event::CheckSuite(serde_json::from_slice(json)?),
@@ -257,7 +257,11 @@ impl Event {
             // TODO have an error type if we try to De a wildcard event payload since they don't
             // exist
             EventType::Wildcard => unimplemented!(),
+            EventType::Unknown => {
+                return Err(io::Error::new(io::ErrorKind::Other, "Unknown EventType"))
+            }
         };
+
         Ok(event)
     }
 
