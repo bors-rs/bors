@@ -438,9 +438,11 @@ impl EventProcessor {
     }
 
     async fn handle_pull_request_review_event(&mut self, e: &PullRequestReviewEvent) -> Result<()> {
+        use github::ReviewState;
+
         let pr_number = e.pull_request.number;
         if let Some(pr) = self.pulls.get_mut(&pr_number) {
-            pr.approved = self
+            let mut approved = self
                 .github
                 .get_review_decision(
                     self.config.repo().owner(),
@@ -448,6 +450,39 @@ impl EventProcessor {
                     pr_number,
                 )
                 .await?;
+
+            // From trial and error it seems like there's a race condition for checking the new
+            // approval status of a PR. That is, the webhook is delivered but the state you get when
+            // querying Github directly reflects the old state, not the new state based on the
+            // current webhook that is being processed. This checks for this potential scenario and
+            // re-queries Github, hoping to get the new state
+            match (pr.approved, approved, e.review.state) {
+                (true, true, ReviewState::Dismissed)
+                | (true, true, ReviewState::ChangesRequested)
+                | (false, false, ReviewState::Approved) => {
+                    info!("Re-Querying for Review status due to potential race condition");
+                    info!(
+                        "Before PR: {} Query: {} Review State: {:?}",
+                        pr.approved, approved, e.review.state
+                    );
+                    tokio::time::delay_for(std::time::Duration::from_millis(300)).await;
+                    approved = self
+                        .github
+                        .get_review_decision(
+                            self.config.repo().owner(),
+                            self.config.repo().name(),
+                            pr_number,
+                        )
+                        .await?;
+                    info!(
+                        "After PR: {} Query: {} Review State: {:?}",
+                        pr.approved, approved, e.review.state
+                    );
+                }
+                _ => {}
+            }
+
+            pr.approved = approved;
         }
 
         if e.action.is_submitted() {

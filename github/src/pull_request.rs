@@ -71,7 +71,7 @@ pub struct PullRequest {
     pub changed_files: Option<u64>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewState {
     Approved,
