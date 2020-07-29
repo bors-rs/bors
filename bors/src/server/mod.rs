@@ -216,10 +216,11 @@ impl Server {
                 )
                 .unwrap();
                 let error = format!(
-                    "Webhook could not be Deserialized\n\nEventType {:#?}\n\nError: {:#?}",
+                    "Webhook could not be Deserialized\n\nEventType {:#?}\n\nError: {:#?}\n\nPayload: {:#?}",
                     webhook.event_type,
                     github::Event::from_json(webhook.event_type, pretty_json.as_bytes())
-                        .unwrap_err()
+                        .unwrap_err(),
+                    pretty_json,
                 );
                 warn!("{}", error);
                 let json_path = format!("{}.json", webhook.delivery_id);
