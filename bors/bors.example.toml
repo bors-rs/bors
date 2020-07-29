@@ -29,7 +29,7 @@ secret = ""
 # maintainer-mode = true
 
 # Time that bors will wait before giving up on CI completing
-# timeout-sections = <seconds>
+# timeout-seconds = <seconds>
 
 # Github checks and status's required to pass on the `auto` branch before merging a PR
 # [repo.checks.<app-name>]
