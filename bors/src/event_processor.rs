@@ -408,10 +408,11 @@ impl EventProcessor {
                     .add_reaction(node_id, github::ReactionType::Rocket)
                     .await?;
 
-                let mut ctx = self.command_context(user, pr_number).unwrap();
-                // Check if the user is authorized before executing the command
-                if command.is_authorized(&ctx).await? {
-                    command.execute(&mut ctx).await?;
+                if let Some(mut ctx) = self.command_context(user, pr_number) {
+                    // Check if the user is authorized before executing the command
+                    if command.is_authorized(&ctx).await? {
+                        command.execute(&mut ctx).await?;
+                    }
                 }
             }
             Some(Err(_)) => {
