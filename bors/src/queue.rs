@@ -10,7 +10,7 @@ use log::info;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
-struct QueueEntry {
+pub struct QueueEntry {
     /// Indicates the priority of the PR
     priority: Priority,
 
@@ -18,7 +18,7 @@ struct QueueEntry {
 }
 
 impl QueueEntry {
-    fn new(number: u64, priority: Priority) -> Self {
+    pub fn new(number: u64, priority: Priority) -> Self {
         Self { number, priority }
     }
 }

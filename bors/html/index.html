@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Bors</title>
+        <style>
+            * { font-family: sans-serif; }
+            code { font-family: monospace; }
+            h1 { font-size: 22px; }
+            h2 { font-size: 18px; }
+            h3 { font-size: 16px; }
+            h4 { font-size: 14px; }
+            p, ul { font-size: 15px; line-height: 150%; }
+            code { background-color: #efefef; }
+            body { max-width: 60em; margin-left: auto; margin-right: auto; }
+            .repos { font-size: 18px; line-height: 180%; }
+        </style>
+    </head>
+    <body>
+        <h1>Bors</h1>
+
+        <h2>Repositories</h2>
+
+        <ul class="repos">
+            {% for repo in repos %}
+            <li><a href="repos/{{repo.owner}}/{{repo.name}}">{{repo.owner}}/{{repo.name}}</a></li>
+            {% endfor %}
+        </ul>
+
+        Request #{{ request_count }}
+
+    </body>
+</html>

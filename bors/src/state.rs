@@ -1,6 +1,6 @@
 use crate::{config::RepoConfig, graphql::GithubClient, project_board::ProjectBoard, Result};
 use github::Oid;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
@@ -218,7 +218,7 @@ impl PullRequestState {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Ord, Eq)]
+#[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Ord, Eq, Serialize)]
 pub enum Priority {
     High,
     Normal,
@@ -241,7 +241,7 @@ impl FromStr for Priority {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Repo {
     owner: String,
     name: String,

@@ -30,6 +30,9 @@ use std::{
     },
 };
 
+const INDEX_HTML: &str = include_str!("../../html/index.html");
+const REPO_HTML: &str = include_str!("../../html/repo.html");
+
 #[derive(Default, Debug)]
 pub struct ServerBuilder {
     smee: bool,
@@ -117,7 +120,25 @@ impl Server {
         match (request.method(), request.uri().path()) {
             (&Method::GET, "/") => {
                 let count = self.counter.load(Ordering::Relaxed);
-                let response = Response::new(Body::from(format!("Request #{}\n", count)));
+
+                let template = liquid::ParserBuilder::with_stdlib()
+                    .build()
+                    .unwrap()
+                    .parse(INDEX_HTML)
+                    .unwrap();
+
+                let repos = self
+                    .installations
+                    .iter()
+                    .map(|i| i.config().repo().to_owned())
+                    .collect::<Vec<_>>();
+                let data = liquid::object!({
+                    "request_count": count,
+                    "repos": repos,
+                });
+                let output = template.render(&data).unwrap();
+
+                let response = Response::new(Body::from(output));
                 Ok(response)
             }
             (&Method::GET, "/github") => Ok(Response::builder()
@@ -160,8 +181,20 @@ impl Server {
             );
 
             if path == &route[..route.len() - 1] || path == route {
+                let template = liquid::ParserBuilder::with_stdlib()
+                    .build()
+                    .unwrap()
+                    .parse(REPO_HTML)
+                    .unwrap();
+
+                let body = template
+                    .render(&installation.repo_liquid_object().await)
+                    .unwrap();
+
+                return Ok(Response::new(Body::from(body)));
+            } else if path.starts_with(&route) && path.ends_with("/debug") {
                 let body = format!(
-                    "{}/{}\n\nConfig:\n{:#?}\n\nState:\n{}",
+                    "{}/{}\n\nConfig:\n{:#?}\n\nState:\n{:#?}",
                     installation.owner(),
                     installation.name(),
                     installation.config(),

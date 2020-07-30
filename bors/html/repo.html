@@ -1,0 +1,169 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Bors queue - {{repo.owner}}/{{repo.name}}</title>
+        <style>
+            * { font-family: sans-serif; }
+            h1 { font-size: 20px; }
+            h2 { font-size: 16px; }
+            p { font-size: 15px; }
+
+            table { border-collapse: collapse; }
+            td, th { border: 2px solid white; padding: 5px; font-size: 13px; }
+            tr:nth-child(even) { background: #ddd; }
+
+            .treeclosed { color: grey }
+            .success { background-color: #80C0F0; }
+            .failure, .error { background-color: #F08080; }
+            .testing { background-color: #F0DE57; }
+            .queued { background-color: #85DB7B; }
+
+            .yes { color: green; }
+            .no { color: red; }
+
+            .sorting_asc:after { content: " ▲"; }
+            .sorting_desc:after { content: " ▼"; }
+            .dataTables_filter, .dataTables_info, .dataTables_empty { display: none; }
+            #search { width: 150px; }
+            .hide { display: none; }
+            th { cursor: pointer; }
+        </style>
+    </head>
+    <body>
+        <h1>Bors queue - <a href="https://github.com/{{repo.owner}}/{{repo.name}}" target="_blank">{{repo.owner}}/{{repo.name}}</a></h1>
+
+        <p>
+            <button type="button" id="debug">Debug Output</button>
+            <button type="button" id="sync">Synchronize</button>
+        </p>
+
+        <p>
+            {{ total }} total
+            /
+            <label><input type="checkbox" id="auto_reload">Auto reload</label>
+            /
+            <input type="search" id="search" placeholder="Search">
+            <button type="button" id="reset">Reset</button>
+        </p>
+
+        <table id="queue">
+            <thead>
+                <tr>
+                    <th class="hide">Sort key</th>
+                    <th><input type="checkbox"></th>
+                    <th>#</th>
+                    <th>Status</th>
+                    <th>Mergeable</th>
+                    <th>Maintainer Can Modify</th>
+                    <th>Title</th>
+                    <th>Head ref</th>
+                    <th>Approved</th>
+                    <th>Priority</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for pull in pull_requests %}
+                <tr>
+                    <td class="hide">{{forloop.index}}</td>
+                    <td><input type="checkbox" data-num="{{pull.number}}"></td>
+                    <td><a href="https://github.com/{{repo.owner}}/{{repo.name}}/pull/{{pull.number}}">{{pull.number}}</a></td>
+                    <td class="{{pull.status}}">
+                        {{pull.status}}
+                    </td>
+                    <td class="{{pull.mergeable}}">{{pull.mergeable}}</td>
+                    <td>{{pull.maintainer_can_modify}}</td>
+                    <td>{{pull.title}}</td>
+                    <td>{{pull.head_ref}}</td>
+                    <td class="{{pull.approved}}">{{pull.approved}}</td>
+                    <td>{{pull.priority}}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <script src="//code.jquery.com/jquery-2.1.3.min.js"></script>
+        <script src="//cdn.datatables.net/1.10.4/js/jquery.dataTables.min.js"></script>
+
+        <script>
+            document.getElementById('debug').onclick = function(ev) {
+                location += '/debug';
+            };
+
+            document.getElementById('sync').onclick = function(ev) {
+                if (!confirm('Retrieve all pull requests?')) return;
+
+                location += '/sync';
+
+                {% comment %}
+                location = 'https://github.com/login/oauth/authorize' +
+                    '?client_id={{oauth_client_id}}' +
+                    '&scope=public_repo,admin:repo_hook' +
+                    '&state=' + encodeURIComponent(JSON.stringify({
+                        cmd: 'synch',
+                        repo_label: '{{repo_label}}',
+                    }));
+                {% endcomment %}
+            };
+
+            var handle_auto_reload = function() {
+                var timer_id = null;
+
+                return function() {
+                    clearInterval(timer_id);
+                    timer_id = null;
+
+                    if (localStorage.bors_auto_reload == 'true') {
+                        timer_id = setInterval(function() {
+                            location.reload(true);
+                        }, 1000 * 60 * 2);
+                    }
+                };
+            }();
+
+            document.getElementById('auto_reload').onclick = function(ev) {
+                localStorage.bors_auto_reload = ev.target.checked;
+
+                handle_auto_reload();
+            };
+
+            document.getElementById('auto_reload').checked = localStorage.bors_auto_reload == 'true';
+
+            handle_auto_reload();
+
+            $(document).ready(function() {
+                var table = $('#queue').DataTable({
+                    paging: false,
+                    order: [],
+                    autoWidth: false,
+                    columnDefs: [
+                        {targets: [1], orderable: false, searchable: false},
+                    ],
+                });
+
+                var search_el = document.getElementById('search');
+
+                search_el.oninput = function(ev) {
+                    table.search(this.value).draw();
+                };
+
+                document.getElementById('reset').onclick = function(ev) {
+                    search_el.value = '';
+                    table.search('').draw();
+
+                    table.order([0, 'asc']).draw();
+                };
+            });
+
+            document.querySelector('#queue thead input[type=checkbox]').onclick = function(ev) {
+                ev.stopPropagation();
+
+                var els = document.querySelectorAll('#queue tbody input[type=checkbox]');
+                for (var i=0;i<els.length;i++) {
+                    els[i].checked = this.checked;
+                }
+            };
+        </script>
+    </body>
+</html>
