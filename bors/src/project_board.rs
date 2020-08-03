@@ -1,5 +1,8 @@
 use crate::{config::RepoConfig, graphql::GithubClient, state::PullRequestState, Result};
-use github::{Project, ProjectColumn};
+use github::{
+    client::{ListProjectCardsOptions, PaginationOptions},
+    Project, ProjectColumn,
+};
 use std::collections::HashMap;
 
 const PROJECT_BOARD_NAME: &str = "bors";
@@ -259,9 +262,16 @@ impl ProjectBoard {
         column_id: u64,
         dst_column: Option<u64>,
     ) -> Result<()> {
+        let list_options = ListProjectCardsOptions {
+            archived_state: None,
+            pagination_options: PaginationOptions {
+                page: None,
+                per_page: Some(100),
+            },
+        };
         for card in github
             .projects()
-            .list_cards(column_id, None)
+            .list_cards(column_id, Some(list_options))
             .await?
             .into_inner()
         {
