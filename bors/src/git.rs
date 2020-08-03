@@ -68,6 +68,11 @@ impl GitRepository {
         self.git().push_to_remote(repo, branch, old_oid, new_oid)
     }
 
+    pub fn fetch_ref(&mut self, r: &str) -> Result<Oid> {
+        self.git().fetch(&[r])?;
+        self.git().fetch_head_oid()
+    }
+
     pub fn fetch_and_rebase(
         &mut self,
         base_ref: &str,
@@ -315,6 +320,10 @@ impl Git {
 
     pub fn head_oid(self) -> Result<Oid> {
         self.ref_to_oid("HEAD")
+    }
+
+    pub fn fetch_head_oid(self) -> Result<Oid> {
+        self.ref_to_oid("FETCH_HEAD")
     }
 
     pub fn ref_to_oid(mut self, r: &str) -> Result<Oid> {
