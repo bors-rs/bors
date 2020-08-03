@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use log::debug;
+use log::{debug, error};
 use reqwest::{header, Client as ReqwestClient, Method, RequestBuilder};
 
 mod error;
@@ -321,6 +321,28 @@ impl Client {
         self.client.request(method, &url)
     }
 
+    async fn response_json<T: serde::de::DeserializeOwned>(
+        response: reqwest::Response,
+    ) -> Result<T> {
+        let msg: serde_json::Value = response.json().await?;
+
+        let ret = match serde_json::from_value(msg.clone()) {
+            Ok(ret) => ret,
+            Err(err) => {
+                let pretty_json = serde_json::to_string_pretty(&msg).unwrap();
+                let error = format!(
+                    "Json payload could not be Deserialized\n\nError: {:#?}\n\nPayload: {:#?}",
+                    err, pretty_json,
+                );
+                error!("{}", error);
+
+                return Err(Error::Message(error.into()));
+            }
+        };
+
+        Ok(ret)
+    }
+
     //TODO explicitly check for and construct a RateLimit error when rate limits are hit
     //TODO explicitly check for an construct an AbuseLimit error
     async fn check_response(
@@ -331,7 +353,7 @@ impl Client {
             let status = response.status();
             // BUG: Don't try to look for a payload for all response types
             // https://developer.github.com/v3/#client-errors
-            let msg = response.json().await?;
+            let msg = Self::response_json(response).await?;
             return Err(Error::GithubClientError(status, msg));
         }
 
@@ -352,7 +374,7 @@ impl Client {
             let status = response.status();
             // BUG: Don't try to look for a payload for all response types
             // https://developer.github.com/v3/#client-errors
-            let msg = response.json().await?;
+            let msg = Self::response_json(response).await?;
             return Err(Error::GithubClientError(status, msg));
         };
 
@@ -373,7 +395,7 @@ impl Client {
         response: reqwest::Response,
     ) -> Result<Response<T>> {
         let (response, pagination, rate) = self.check_response(response).await?;
-        let json = response.json().await?;
+        let json = Self::response_json(response).await?;
         Ok(Response::new(pagination, rate, json))
     }
 
