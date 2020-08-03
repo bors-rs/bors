@@ -400,7 +400,13 @@ impl EventProcessor {
     ) -> Result<()> {
         info!("comment: {:#?}", comment);
 
-        match comment.and_then(Command::from_comment) {
+        match comment.and_then(|c| {
+            if let Some(cmd) = Command::from_comment(c) {
+                Some(cmd)
+            } else {
+                Command::from_comment_with_username(c, self.git_repository.user())
+            }
+        }) {
             Some(Ok(command)) => {
                 info!("Valid Command");
 

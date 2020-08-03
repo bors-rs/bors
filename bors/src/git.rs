@@ -54,6 +54,10 @@ impl GitRepository {
         })
     }
 
+    pub fn user(&self) -> &str {
+        &self.git_config.user
+    }
+
     pub fn push_branch(&mut self, branch: &str) -> Result<()> {
         self.git().push_branch(branch, true)
     }
