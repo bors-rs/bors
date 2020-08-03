@@ -256,7 +256,7 @@ impl<'a> ProjectClient<'a> {
     pub async fn list_cards(
         &self,
         column_id: u64,
-        options: Option<ListProjectCardsOptions>,
+        options: Option<&ListProjectCardsOptions>,
     ) -> Result<Response<Vec<ProjectCard>>> {
         let url = format!("projects/columns/{}/cards", column_id);
         let response = self

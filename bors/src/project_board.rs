@@ -1,7 +1,7 @@
 use crate::{config::RepoConfig, graphql::GithubClient, state::PullRequestState, Result};
 use github::{
     client::{ListProjectCardsOptions, PaginationOptions},
-    Project, ProjectColumn,
+    Project, ProjectCard, ProjectColumn,
 };
 use std::collections::HashMap;
 
@@ -256,25 +256,41 @@ impl ProjectBoard {
         Ok(())
     }
 
-    async fn assign_or_delete_cards_in_column(
-        github: &GithubClient,
-        open_pulls: &mut HashMap<u64, PullRequestState>,
-        column_id: u64,
-        dst_column: Option<u64>,
-    ) -> Result<()> {
-        let list_options = ListProjectCardsOptions {
+    async fn list_cards(github: &GithubClient, column_id: u64) -> Result<Vec<ProjectCard>> {
+        let mut list_options = ListProjectCardsOptions {
             archived_state: None,
             pagination_options: PaginationOptions {
                 page: None,
                 per_page: Some(100),
             },
         };
-        for card in github
-            .projects()
-            .list_cards(column_id, Some(list_options))
-            .await?
-            .into_inner()
-        {
+        let mut has_next_page = true;
+        let mut cards = Vec::new();
+
+        while has_next_page {
+            let response = github
+                .projects()
+                .list_cards(column_id, Some(&list_options))
+                .await?;
+
+            list_options.pagination_options.page = response.pagination().next_page;
+            if list_options.pagination_options.page.is_none() {
+                has_next_page = false;
+            }
+
+            cards.extend(response.into_inner())
+        }
+
+        Ok(cards)
+    }
+
+    async fn assign_or_delete_cards_in_column(
+        github: &GithubClient,
+        open_pulls: &mut HashMap<u64, PullRequestState>,
+        column_id: u64,
+        dst_column: Option<u64>,
+    ) -> Result<()> {
+        for card in Self::list_cards(&github, column_id).await? {
             match card.issue_number().and_then(|n| open_pulls.get_mut(&n)) {
                 Some(pull) => {
                     pull.project_card_id = Some(card.id);
