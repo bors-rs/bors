@@ -60,8 +60,32 @@ pub struct GithubClientError {
 pub enum GithubClientErrorType {
     Message(String),
     Code {
-        resourse: String,
+        resource: String,
         field: String,
         code: String,
+        message: Option<String>,
     },
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn error_type() {
+        let json = r#"{
+            "documentation_url": "https://developer.github.com/v3/projects/cards/#create-a-project-card",
+            "errors": [
+                {
+                    "code": "unprocessable",
+                    "field": "data",
+                    "message": "Project already has the associated issue",
+                    "resource": "ProjectCard"
+                }
+            ],
+            "message": "Validation Failed"
+        }"#;
+
+        let _e: GithubClientError = serde_json::from_str(&json).unwrap();
+    }
 }
