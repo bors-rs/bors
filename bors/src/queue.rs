@@ -131,7 +131,7 @@ impl MergeQueue {
         }
 
         // Finally 'merge' the PR by updating the 'base_ref' with `merge_oid`
-        github
+        if let Err(e) = github
             .git()
             .update_ref(
                 config.owner(),
@@ -140,7 +140,23 @@ impl MergeQueue {
                 &merge_oid,
                 false,
             )
-            .await?;
+            .await
+        {
+            pull.update_status(Status::InReview, config, github, project_board)
+                .await?;
+
+            let comment = format!(
+                "Error occured while trying to merge into {}:\n```\n{:#?}\n```",
+                pull.base_ref_name, e
+            );
+
+            github
+                .issues()
+                .create_comment(config.owner(), config.name(), pull.number, &comment)
+                .await?;
+
+            return Ok(());
+        }
 
         if let Some(board) = project_board {
             board.delete_card(github, &mut pull).await?;
