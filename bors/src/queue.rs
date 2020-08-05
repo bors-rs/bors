@@ -382,71 +382,89 @@ impl MergeQueue {
         let mut queue = queue.into_iter();
 
         while let (None, Some(pull)) = (self.head, queue.next()) {
-            info!("Creating merge for pr #{}", pull.number);
-
-            // Attempt to rebase the PR onto 'base_ref' and push to the 'auto' branch for
-            // testing
-            if let Some(merge_oid) = repo.fetch_and_rebase(
-                &pull.base_ref_name,
-                &pull.head_ref_oid,
-                "auto",
-                pull.number,
-                pull.has_label(config.labels().squash()),
-            )? {
-                repo.push_branch("auto")?;
-                info!("pushed 'auto' branch");
-
+            if let Some(merge_oid) =
+                Self::create_merge_and_update_github(config, github, repo, pull, "auto").await?
+            {
                 pull.update_status(Status::testing(merge_oid), config, github, project_board)
                     .await?;
                 self.head = Some(pull.number);
-
-                // Create github status
-                github
-                    .repos()
-                    .create_status(
-                        config.owner(),
-                        config.name(),
-                        &pull.head_ref_oid.to_string(),
-                        &github::client::CreateStatusRequest {
-                            state: github::StatusEventState::Pending,
-                            target_url: None,
-                            description: None,
-                            context: "bors",
-                        },
-                    )
-                    .await?;
             } else {
                 pull.update_status(Status::InReview, config, github, project_board)
-                    .await?;
-
-                github
-                    .repos()
-                    .create_status(
-                        config.owner(),
-                        config.name(),
-                        &pull.head_ref_oid.to_string(),
-                        &github::client::CreateStatusRequest {
-                            state: github::StatusEventState::Error,
-                            target_url: None,
-                            description: Some("Merge Conflict"),
-                            context: "bors",
-                        },
-                    )
-                    .await?;
-
-                github
-                    .issues()
-                    .create_comment(
-                        config.owner(),
-                        config.name(),
-                        pull.number,
-                        ":lock: Merge Conflict",
-                    )
                     .await?;
             }
         }
 
         Ok(())
+    }
+
+    async fn create_merge_and_update_github(
+        config: &RepoConfig,
+        github: &GithubClient,
+        repo: &mut GitRepository,
+        pull: &PullRequestState,
+        branch: &str,
+    ) -> Result<Option<Oid>> {
+        info!("Creating merge for pr #{}", pull.number);
+
+        // Attempt to rebase the PR onto 'base_ref' and push to the 'auto' branch for
+        // testing
+        let merge = if let Some(merge_oid) = repo.fetch_and_rebase(
+            &pull.base_ref_name,
+            &pull.head_ref_oid,
+            branch,
+            pull.number,
+            pull.has_label(config.labels().squash()),
+        )? {
+            repo.push_branch(branch)?;
+            info!("pushed '{}' branch", branch);
+
+            // Create github status
+            github
+                .repos()
+                .create_status(
+                    config.owner(),
+                    config.name(),
+                    &pull.head_ref_oid.to_string(),
+                    &github::client::CreateStatusRequest {
+                        state: github::StatusEventState::Pending,
+                        target_url: None,
+                        description: None,
+                        context: "bors",
+                    },
+                )
+                .await?;
+
+            Some(merge_oid)
+        } else {
+            github
+                .repos()
+                .create_status(
+                    config.owner(),
+                    config.name(),
+                    &pull.head_ref_oid.to_string(),
+                    &github::client::CreateStatusRequest {
+                        state: github::StatusEventState::Error,
+                        target_url: None,
+                        description: Some("Merge Conflict"),
+                        context: "bors",
+                    },
+                )
+                .await?;
+
+            github
+                .issues()
+                .create_comment(
+                    config.owner(),
+                    config.name(),
+                    pull.number,
+                    ":lock: Merge Conflict",
+                )
+                .await?;
+
+            None
+        };
+
+        Ok(merge)
     }
 }
 
