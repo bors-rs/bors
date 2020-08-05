@@ -195,6 +195,78 @@ impl MergeQueue {
                 .await?;
         }
 
+        self.process_canaries(config, github, repo, project_board, pulls)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn process_canaries(
+        &self,
+        config: &RepoConfig,
+        github: &GithubClient,
+        repo: &mut GitRepository,
+        project_board: Option<&ProjectBoard>,
+        pulls: &mut HashMap<u64, PullRequestState>,
+    ) -> Result<()> {
+        for (_, pull) in pulls.iter_mut().filter(|(_n, p)| p.status.is_canary()) {
+            let (merge_oid, test_suite_result) = match &pull.status {
+                Status::Canary {
+                    merge_oid,
+                    tests_started_at,
+                    test_results,
+                } => {
+                    let test_suite_result =
+                        TestSuiteResult::new(*tests_started_at, test_results, config);
+                    (merge_oid, test_suite_result)
+                }
+                _ => continue,
+            };
+
+            Self::update_github_based_on_test_suite_results(
+                &pull,
+                &test_suite_result,
+                merge_oid,
+                config,
+                github,
+            )
+            .await?;
+
+            match test_suite_result {
+                TestSuiteResult::Failed { .. } | TestSuiteResult::TimedOut => {
+                    pull.update_status(Status::InReview, config, github, project_board)
+                        .await?;
+                }
+
+                TestSuiteResult::Passed => {
+                    pull.update_status(Status::InReview, config, github, project_board)
+                        .await?;
+                    github
+                        .issues()
+                        .create_comment(
+                            config.owner(),
+                            config.name(),
+                            pull.number,
+                            ":sunny: Canary successful",
+                        )
+                        .await?;
+                }
+
+                TestSuiteResult::Pending => {}
+            }
+        }
+
+        for (_, pull) in pulls.iter_mut().filter(|(_n, p)| p.canary_requested) {
+            pull.canary_requested = false;
+
+            if let Some(merge_oid) =
+                Self::create_merge_and_update_github(config, github, repo, pull, "canary").await?
+            {
+                pull.update_status(Status::canary(merge_oid), config, github, project_board)
+                    .await?;
+            }
+        }
+
         Ok(())
     }
 

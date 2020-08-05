@@ -120,6 +120,8 @@ impl From<list_pulls::ListPullsRepositoryPullRequestsNodes> for crate::state::Pu
             approved,
             status: crate::state::Status::InReview,
             project_card_id: None,
+
+            canary_requested: false,
         }
     }
 }

@@ -34,6 +34,8 @@ pub struct PullRequestState {
 
     pub status: Status,
     pub project_card_id: Option<u64>,
+
+    pub canary_requested: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -81,6 +83,10 @@ impl Status {
 
     pub fn is_testing(&self) -> bool {
         matches!(self, Status::Testing { .. })
+    }
+
+    pub fn is_canary(&self) -> bool {
+        matches!(self, Status::Canary { .. })
     }
 
     pub fn testing(merge_oid: Oid) -> Status {
@@ -138,6 +144,7 @@ impl PullRequestState {
             labels,
             status: Status::InReview,
             project_card_id: None,
+            canary_requested: false,
         }
     }
 
