@@ -21,6 +21,7 @@ pub struct Command {
 enum CommandType {
     Land(Land),
     Cancel,
+    Canary,
     Help,
     Priority(PriorityCommand),
 }
@@ -30,6 +31,7 @@ impl CommandType {
         match &self {
             CommandType::Land(_) => "Land",
             CommandType::Cancel => "Cancel",
+            CommandType::Canary => "Canary",
             CommandType::Help => "Help",
             CommandType::Priority(_) => "Priority",
         }
@@ -113,6 +115,7 @@ impl Command {
         let command_type = match command_name {
             "land" | "merge" => CommandType::Land(Land::with_args(args)?),
             "cancel" | "stop" => CommandType::Cancel,
+            "canary" | "try" => CommandType::Canary,
             "help" | "h" => CommandType::Help,
             "priority" => CommandType::Priority(PriorityCommand::with_args(args)?),
 
@@ -177,6 +180,7 @@ impl Command {
                 Self::mark_pr_ready_to_land(&mut ctx).await?;
             }
             CommandType::Cancel => Self::cancel_land(ctx).await?,
+            CommandType::Canary => Self::canary_land(ctx),
             CommandType::Help => {
                 ctx.create_pr_comment(&Help::new(ctx.config(), ctx.project_board()).to_string())
                     .await?
@@ -299,6 +303,12 @@ impl Command {
         info!("Canceling land of pr #{}", ctx.pr().number);
 
         ctx.update_pr_status(Status::InReview).await
+    }
+
+    fn canary_land(ctx: &mut CommandContext<'_>) {
+        info!("Canarying land of pr #{}", ctx.pr().number);
+
+        ctx.pr_mut().canary_requested = true;
     }
 }
 
