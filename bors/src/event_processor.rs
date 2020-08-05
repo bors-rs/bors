@@ -309,7 +309,9 @@ impl EventProcessor {
         self.pulls
             .iter_mut()
             .find(|(_n, pr)| match &pr.status {
-                Status::Testing { merge_oid, .. } => merge_oid == oid,
+                Status::Testing { merge_oid, .. } | Status::Canary { merge_oid, .. } => {
+                    merge_oid == oid
+                }
                 Status::InReview | Status::Queued => false,
             })
             .map(|(_n, pr)| pr)

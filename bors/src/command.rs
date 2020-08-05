@@ -280,6 +280,14 @@ impl Command {
 
                 ctx.create_pr_comment(&msg).await?;
             }
+            Status::Canary { .. } => {
+                let msg = format!(
+                    "@{} :bulb: This PR is currently being canaried, cancel the canary before queuing for landing",
+                    ctx.sender(),
+                );
+
+                ctx.create_pr_comment(&msg).await?;
+            }
         }
 
         Ok(())

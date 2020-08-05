@@ -3,7 +3,7 @@ use crate::{
     git::GitRepository,
     graphql::GithubClient,
     project_board::ProjectBoard,
-    state::{Priority, PullRequestState, Status},
+    state::{Priority, PullRequestState, Status, StatusType},
     Result,
 };
 use log::info;
@@ -11,6 +11,8 @@ use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub struct QueueEntry {
+    status: StatusType,
+
     /// Indicates the priority of the PR
     priority: Priority,
 
@@ -18,8 +20,12 @@ pub struct QueueEntry {
 }
 
 impl QueueEntry {
-    pub fn new(number: u64, priority: Priority) -> Self {
-        Self { number, priority }
+    pub fn new(number: u64, status: StatusType, priority: Priority) -> Self {
+        Self {
+            number,
+            status,
+            priority,
+        }
     }
 }
 
@@ -351,7 +357,9 @@ impl MergeQueue {
             .map(|(_n, p)| p)
             .filter(|p| p.status.is_queued())
             .collect();
-        queue.sort_unstable_by_key(|p| QueueEntry::new(p.number, p.priority(config)));
+        queue.sort_unstable_by_key(|p| {
+            QueueEntry::new(p.number, p.status.status_type(), p.priority(config))
+        });
         let mut queue = queue.into_iter();
 
         while let (None, Some(pull)) = (self.head, queue.next()) {
@@ -430,41 +438,41 @@ mod test {
     #[test]
     fn priority_sort() {
         let mut entries = vec![
-            QueueEntry::new(1, Priority::Normal),
-            QueueEntry::new(10, Priority::High),
+            QueueEntry::new(1, StatusType::InReview, Priority::Normal),
+            QueueEntry::new(10, StatusType::InReview, Priority::High),
         ];
 
         entries.sort();
 
         let expected = vec![
-            QueueEntry::new(10, Priority::High),
-            QueueEntry::new(1, Priority::Normal),
+            QueueEntry::new(10, StatusType::InReview, Priority::High),
+            QueueEntry::new(1, StatusType::InReview, Priority::Normal),
         ];
         assert_eq!(entries, expected);
 
         let mut entries = vec![
-            QueueEntry::new(10, Priority::Normal),
-            QueueEntry::new(1, Priority::Normal),
+            QueueEntry::new(10, StatusType::InReview, Priority::Normal),
+            QueueEntry::new(1, StatusType::InReview, Priority::Normal),
         ];
 
         entries.sort();
 
         let expected = vec![
-            QueueEntry::new(1, Priority::Normal),
-            QueueEntry::new(10, Priority::Normal),
+            QueueEntry::new(1, StatusType::InReview, Priority::Normal),
+            QueueEntry::new(10, StatusType::InReview, Priority::Normal),
         ];
         assert_eq!(entries, expected);
 
         let mut entries = vec![
-            QueueEntry::new(1, Priority::Low),
-            QueueEntry::new(10, Priority::Normal),
+            QueueEntry::new(1, StatusType::InReview, Priority::Low),
+            QueueEntry::new(10, StatusType::InReview, Priority::Normal),
         ];
 
         entries.sort();
 
         let expected = vec![
-            QueueEntry::new(10, Priority::Normal),
-            QueueEntry::new(1, Priority::Low),
+            QueueEntry::new(10, StatusType::InReview, Priority::Normal),
+            QueueEntry::new(1, StatusType::InReview, Priority::Low),
         ];
         assert_eq!(entries, expected);
     }
