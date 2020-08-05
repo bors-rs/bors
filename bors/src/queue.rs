@@ -3,9 +3,10 @@ use crate::{
     git::GitRepository,
     graphql::GithubClient,
     project_board::ProjectBoard,
-    state::{Priority, PullRequestState, Status, StatusType},
+    state::{Priority, PullRequestState, Status, StatusType, TestSuiteResult},
     Result,
 };
+use github::Oid;
 use log::info;
 use std::collections::HashMap;
 
@@ -223,120 +224,138 @@ impl MergeQueue {
 
         // Early return if the PR that was currently being tested had its state changed from
         // `Status::Testing`, e.g. if the land was canceled.
-        let (merge_oid, tests_started_at, test_results) = match &pull.status {
+        let (merge_oid, test_suite_result) = match &pull.status {
             Status::Testing {
                 merge_oid,
                 tests_started_at,
                 test_results,
-            } => (merge_oid, tests_started_at, test_results),
+            } => {
+                let test_suite_result =
+                    TestSuiteResult::new(*tests_started_at, test_results, config);
+                (merge_oid, test_suite_result)
+            }
             _ => {
                 self.head = None;
                 return Ok(());
             }
         };
 
-        // Check if there were any test failures from configured checks
-        if let Some((name, result)) = config
-            .checks()
-            .filter_map(|name| test_results.get(name).map(|result| (name, result.clone())))
-            .find(|(_name, result)| !result.passed)
-        {
-            // Remove the PR from the Queue
-            // XXX Maybe mark as "Failed"?
-            pull.update_status(Status::InReview, config, github, project_board)
-                .await?;
-            self.head.take();
+        Self::update_github_based_on_test_suite_results(
+            &pull,
+            &test_suite_result,
+            merge_oid,
+            config,
+            github,
+        )
+        .await?;
 
-            // Create github status/check
-            github
-                .repos()
-                .create_status(
-                    config.owner(),
-                    config.name(),
-                    &pull.head_ref_oid.to_string(),
-                    &github::client::CreateStatusRequest {
-                        state: github::StatusEventState::Failure,
-                        target_url: Some(&result.details_url),
-                        description: None,
-                        context: "bors",
-                    },
-                )
-                .await?;
+        match test_suite_result {
+            TestSuiteResult::Failed { .. } | TestSuiteResult::TimedOut => {
+                // Remove the PR from the Queue
+                // XXX Maybe mark as "Failed"?
+                pull.update_status(Status::InReview, config, github, project_board)
+                    .await?;
+                self.head.take();
+            }
 
-            // Report the Error
-            github
-                .issues()
-                .create_comment(
-                    config.owner(),
-                    config.name(),
-                    pull.number,
-                    &format!(
-                        ":broken_heart: Test Failed - [{}]({})",
-                        name, result.details_url
-                    ),
-                )
-                .await?;
+            TestSuiteResult::Passed => {
+                self.land_pr(config, github, repo, project_board, pulls)
+                    .await?;
+            }
 
-        // Check if all tests have completed and passed
-        } else if config
-            .checks()
-            .map(|name| test_results.get(name))
-            .all(|result| result.map(|r| r.passed).unwrap_or(false))
-        {
-            // Create github status/check on the merge commit
-            github
-                .repos()
-                .create_status(
-                    config.owner(),
-                    config.name(),
-                    &merge_oid.to_string(),
-                    &github::client::CreateStatusRequest {
-                        state: github::StatusEventState::Success,
-                        target_url: None,
-                        description: None,
-                        context: "bors",
-                    },
-                )
-                .await?;
+            TestSuiteResult::Pending => {}
+        }
 
-            self.land_pr(config, github, repo, project_board, pulls)
-                .await?;
+        Ok(())
+    }
 
-        // Check if the test has timed-out
-        } else if tests_started_at.elapsed() >= config.timeout() {
-            info!("PR #{} timed-out", pull.number);
+    async fn update_github_based_on_test_suite_results(
+        pull: &PullRequestState,
+        test_suite_result: &TestSuiteResult,
+        merge_oid: &Oid,
+        config: &RepoConfig,
+        github: &GithubClient,
+    ) -> Result<()> {
+        match test_suite_result {
+            TestSuiteResult::Failed { name, result } => {
+                // Create github status/check
+                github
+                    .repos()
+                    .create_status(
+                        config.owner(),
+                        config.name(),
+                        &pull.head_ref_oid.to_string(),
+                        &github::client::CreateStatusRequest {
+                            state: github::StatusEventState::Failure,
+                            target_url: Some(&result.details_url),
+                            description: None,
+                            context: "bors",
+                        },
+                    )
+                    .await?;
 
-            // Remove the PR from the Queue
-            // XXX Maybe mark as "Failed"?
-            pull.update_status(Status::InReview, config, github, project_board)
-                .await?;
-            self.head = None;
+                // Report the Error
+                github
+                    .issues()
+                    .create_comment(
+                        config.owner(),
+                        config.name(),
+                        pull.number,
+                        &format!(
+                            ":broken_heart: Test Failed - [{}]({})",
+                            name, result.details_url
+                        ),
+                    )
+                    .await?;
+            }
+            TestSuiteResult::Passed => {
+                // Create github status/check on the merge commit
+                github
+                    .repos()
+                    .create_status(
+                        config.owner(),
+                        config.name(),
+                        &merge_oid.to_string(),
+                        &github::client::CreateStatusRequest {
+                            state: github::StatusEventState::Success,
+                            target_url: None,
+                            description: None,
+                            context: "bors",
+                        },
+                    )
+                    .await?;
+            }
 
-            github
-                .repos()
-                .create_status(
-                    config.owner(),
-                    config.name(),
-                    &pull.head_ref_oid.to_string(),
-                    &github::client::CreateStatusRequest {
-                        state: github::StatusEventState::Failure,
-                        target_url: None,
-                        description: Some("Timed-out"),
-                        context: "bors",
-                    },
-                )
-                .await?;
+            TestSuiteResult::TimedOut => {
+                info!("PR #{} timed-out", pull.number);
 
-            // Report the Error
-            github
-                .issues()
-                .create_comment(
-                    config.owner(),
-                    config.name(),
-                    pull.number,
-                    ":boom: Tests timed-out",
-                )
-                .await?;
+                github
+                    .repos()
+                    .create_status(
+                        config.owner(),
+                        config.name(),
+                        &pull.head_ref_oid.to_string(),
+                        &github::client::CreateStatusRequest {
+                            state: github::StatusEventState::Failure,
+                            target_url: None,
+                            description: Some("Timed-out"),
+                            context: "bors",
+                        },
+                    )
+                    .await?;
+
+                // Report the Error
+                github
+                    .issues()
+                    .create_comment(
+                        config.owner(),
+                        config.name(),
+                        pull.number,
+                        ":boom: Tests timed-out",
+                    )
+                    .await?;
+            }
+            TestSuiteResult::Pending => {}
         }
 
         Ok(())

@@ -248,6 +248,45 @@ impl PullRequestState {
     }
 }
 
+pub enum TestSuiteResult {
+    Pending,
+    TimedOut,
+    Passed,
+    Failed { name: String, result: TestResult },
+}
+
+impl TestSuiteResult {
+    pub fn new(
+        tests_started_at: std::time::Instant,
+        test_results: &HashMap<String, TestResult>,
+        config: &RepoConfig,
+    ) -> Self {
+        // Check if there were any test failures from configured checks
+        if let Some((name, result)) = config
+            .checks()
+            .filter_map(|name| test_results.get(name).map(|result| (name, result)))
+            .find(|(_name, result)| !result.passed)
+        {
+            TestSuiteResult::Failed {
+                name: name.to_owned(),
+                result: result.to_owned(),
+            }
+        // Check if all tests have completed and passed
+        } else if config
+            .checks()
+            .map(|name| test_results.get(name))
+            .all(|result| result.map(|r| r.passed).unwrap_or(false))
+        {
+            TestSuiteResult::Passed
+        // Check if the test has timed-out
+        } else if tests_started_at.elapsed() >= config.timeout() {
+            TestSuiteResult::TimedOut
+        } else {
+            TestSuiteResult::Pending
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Ord, Eq, Serialize)]
 pub enum Priority {
     High,
