@@ -42,11 +42,24 @@ pub struct TestResult {
     pub details_url: String,
 }
 
+#[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Ord, Eq)]
+pub enum StatusType {
+    Testing,
+    Canary,
+    Queued,
+    InReview,
+}
+
 #[derive(Clone, Debug)]
 pub enum Status {
     InReview,
     Queued,
     Testing {
+        merge_oid: Oid,
+        tests_started_at: std::time::Instant,
+        test_results: HashMap<String, TestResult>,
+    },
+    Canary {
         merge_oid: Oid,
         tests_started_at: std::time::Instant,
         test_results: HashMap<String, TestResult>,
@@ -75,6 +88,23 @@ impl Status {
             merge_oid,
             tests_started_at: std::time::Instant::now(),
             test_results: HashMap::new(),
+        }
+    }
+
+    pub fn canary(merge_oid: Oid) -> Status {
+        Status::Canary {
+            merge_oid,
+            tests_started_at: std::time::Instant::now(),
+            test_results: HashMap::new(),
+        }
+    }
+
+    pub fn status_type(&self) -> StatusType {
+        match self {
+            Status::InReview => StatusType::InReview,
+            Status::Queued => StatusType::Queued,
+            Status::Testing { .. } => StatusType::Testing,
+            Status::Canary { .. } => StatusType::Canary,
         }
     }
 }
@@ -136,11 +166,7 @@ impl PullRequestState {
         self.status = status;
 
         if let Some(board) = project_board {
-            match &self.status {
-                Status::InReview => board.move_to_review(github, &self).await?,
-                Status::Queued => board.move_to_queued(github, &self).await?,
-                Status::Testing { .. } => board.move_to_testing(github, &self).await?,
-            }
+            board.move_pr_to_status_column(github, &self).await?;
         }
 
         Ok(())
@@ -203,6 +229,10 @@ impl PullRequestState {
         conclusion: github::Conclusion,
     ) {
         if let Status::Testing {
+            ref mut test_results,
+            ..
+        }
+        | Status::Canary {
             ref mut test_results,
             ..
         } = self.status

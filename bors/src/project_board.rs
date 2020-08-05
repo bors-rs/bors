@@ -1,4 +1,9 @@
-use crate::{config::RepoConfig, graphql::GithubClient, state::PullRequestState, Result};
+use crate::{
+    config::RepoConfig,
+    graphql::GithubClient,
+    state::{PullRequestState, Status},
+    Result,
+};
 use github::{
     client::{ListProjectCardsOptions, PaginationOptions},
     Project, ProjectCard, ProjectColumn,
@@ -9,6 +14,7 @@ const PROJECT_BOARD_NAME: &str = "bors";
 const REVIEW_COLUMN_NAME: &str = "In Review";
 const QUEUED_COLUMN_NAME: &str = "Queued";
 const TESTING_COLUMN_NAME: &str = "Testing";
+const CANARY_COLUMN_NAME: &str = "Canary";
 
 #[derive(Debug)]
 pub struct ProjectBoard {
@@ -16,6 +22,7 @@ pub struct ProjectBoard {
     review_column: ProjectColumn,
     queued_column: ProjectColumn,
     testing_column: ProjectColumn,
+    canary_column: ProjectColumn,
 }
 
 impl ProjectBoard {
@@ -23,37 +30,19 @@ impl ProjectBoard {
         &self.board
     }
 
-    pub async fn move_to_review(
+    pub async fn move_pr_to_status_column(
         &self,
         github: &GithubClient,
         pull: &PullRequestState,
     ) -> Result<()> {
         if let Some(card_id) = pull.project_card_id {
-            Self::move_card_to_column(github, card_id, self.review_column.id).await?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn move_to_queued(
-        &self,
-        github: &GithubClient,
-        pull: &PullRequestState,
-    ) -> Result<()> {
-        if let Some(card_id) = pull.project_card_id {
-            Self::move_card_to_column(github, card_id, self.queued_column.id).await?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn move_to_testing(
-        &self,
-        github: &GithubClient,
-        pull: &PullRequestState,
-    ) -> Result<()> {
-        if let Some(card_id) = pull.project_card_id {
-            Self::move_card_to_column(github, card_id, self.testing_column.id).await?;
+            let column_id = match &pull.status {
+                Status::InReview => self.review_column.id,
+                Status::Queued => self.queued_column.id,
+                Status::Testing { .. } => self.testing_column.id,
+                Status::Canary { .. } => self.canary_column.id,
+            };
+            Self::move_card_to_column(github, card_id, column_id).await?;
         }
 
         Ok(())
@@ -101,7 +90,7 @@ impl ProjectBoard {
     ) -> Result<Self> {
         let board = Self::create_or_get_project_board(github, config).await?;
 
-        let (review_column, queued_column, testing_column) =
+        let (review_column, queued_column, testing_column, canary_column) =
             Self::create_or_get_columns(github, board.id).await?;
 
         Self::init_project_cards(
@@ -118,6 +107,7 @@ impl ProjectBoard {
             review_column,
             queued_column,
             testing_column,
+            canary_column,
         })
     }
 
@@ -158,10 +148,12 @@ impl ProjectBoard {
         github::ProjectColumn,
         github::ProjectColumn,
         github::ProjectColumn,
+        github::ProjectColumn,
     )> {
         let mut review_column = None;
         let mut queued_column = None;
         let mut testing_column = None;
+        let mut canary_column = None;
 
         for column in github
             .projects()
@@ -170,9 +162,10 @@ impl ProjectBoard {
             .into_inner()
         {
             match column.name.as_ref() {
-                "In Review" => review_column = Some(column),
-                "Queued" => queued_column = Some(column),
-                "Testing" => testing_column = Some(column),
+                REVIEW_COLUMN_NAME => review_column = Some(column),
+                QUEUED_COLUMN_NAME => queued_column = Some(column),
+                TESTING_COLUMN_NAME => testing_column = Some(column),
+                CANARY_COLUMN_NAME => canary_column = Some(column),
                 // Delete columns which don't match
                 _ => {
                     github.projects().delete_column(column.id).await?;
@@ -189,8 +182,11 @@ impl ProjectBoard {
         let testing_column =
             Self::unwrap_or_create_column(testing_column, TESTING_COLUMN_NAME, project_id, github)
                 .await?;
+        let canary_column =
+            Self::unwrap_or_create_column(canary_column, CANARY_COLUMN_NAME, project_id, github)
+                .await?;
 
-        Ok((review_column, queued_column, testing_column))
+        Ok((review_column, queued_column, testing_column, canary_column))
     }
 
     async fn unwrap_or_create_column(

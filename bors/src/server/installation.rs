@@ -53,7 +53,9 @@ impl Installation {
         let (_queue, pulls) = self.event_processor.get_state().await.unwrap();
 
         let mut pulls = pulls.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
-        pulls.sort_unstable_by_key(|p| EntrySort::new(p, self.config()));
+        pulls.sort_unstable_by_key(|p| {
+            QueueEntry::new(p.number, p.status.status_type(), p.priority(self.config()))
+        });
         pulls
     }
 
@@ -75,27 +77,6 @@ impl Installation {
         });
 
         object
-    }
-}
-
-#[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
-struct EntrySort {
-    state: u8,
-    queue_entry: QueueEntry,
-}
-
-impl EntrySort {
-    pub fn new(p: &PullRequestState, config: &RepoConfig) -> Self {
-        let state = match p.status {
-            crate::state::Status::InReview => 2,
-            crate::state::Status::Queued => 1,
-            crate::state::Status::Testing { .. } => 0,
-        };
-
-        Self {
-            state,
-            queue_entry: QueueEntry::new(p.number, p.priority(config)),
-        }
     }
 }
 
@@ -121,6 +102,7 @@ impl LiquidPullRequest {
             Status::InReview => "",
             Status::Queued => "queued",
             Status::Testing { .. } => "testing",
+            Status::Canary { .. } => "canary",
         };
 
         let mergeable = if pr.mergeable { "yes" } else { "no" };
