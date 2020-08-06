@@ -420,6 +420,10 @@ impl std::fmt::Display for Help<'_> {
         )?;
         writeln!(
             f,
+            "| __Canary__ | `canary`, `try` | canary a PR by performing all checks without merging |"
+        )?;
+        writeln!(
+            f,
             "| __Cancel__ | `cancel`, `stop` | stop an in-progress land |"
         )?;
         writeln!(f, "| __Help__ | `help`, `h` | show this help message |")?;
