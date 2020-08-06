@@ -89,7 +89,7 @@ struct LiquidPullRequest {
     mergeable: &'static str,
     head_ref: String,
     approved: &'static str,
-    maintainer_can_modify: bool,
+    maintainer_can_modify: &'static str,
     priority: Priority,
 }
 
@@ -107,6 +107,11 @@ impl LiquidPullRequest {
 
         let mergeable = if pr.mergeable { "yes" } else { "no" };
         let approved = if pr.approved { "yes" } else { "no" };
+        let maintainer_can_modify = if pr.maintainer_can_modify {
+            "yes"
+        } else {
+            "no"
+        };
 
         let head_ref = if let Some(author) = pr.author {
             format!("{}:{}", author, pr.head_ref_name)
@@ -120,7 +125,7 @@ impl LiquidPullRequest {
             status,
             mergeable,
             approved,
-            maintainer_can_modify: pr.maintainer_can_modify,
+            maintainer_can_modify,
             head_ref,
             priority,
         }
