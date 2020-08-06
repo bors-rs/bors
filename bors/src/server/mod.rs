@@ -248,18 +248,13 @@ impl Server {
                     &serde_json::from_slice::<serde_json::Value>(&webhook.body).unwrap(),
                 )
                 .unwrap();
-                let error = format!(
+                error!(
                     "Webhook could not be Deserialized\n\nEventType {:#?}\n\nError: {:#?}\n\nPayload: {:#?}",
                     webhook.event_type,
                     github::Event::from_json(webhook.event_type, pretty_json.as_bytes())
                         .unwrap_err(),
                     pretty_json,
                 );
-                warn!("{}", error);
-                let json_path = format!("{}.json", webhook.delivery_id);
-                let error_path = format!("{}.err", webhook.delivery_id);
-                std::fs::write(json_path, pretty_json.as_bytes()).unwrap();
-                std::fs::write(error_path, error.as_bytes()).unwrap();
                 return Ok(());
             }
         };
