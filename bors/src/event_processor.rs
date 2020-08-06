@@ -108,9 +108,12 @@ impl EventProcessor {
             Webhook { event, delivery_id } => self.handle_webhook(event, delivery_id).await?,
 
             Request::GetState(oneshot) => {
-                oneshot
+                if oneshot
                     .send((self.merge_queue.clone(), self.pulls.clone()))
-                    .unwrap();
+                    .is_err()
+                {
+                    warn!("Unable to deliver current state, receiver dropped");
+                }
             }
 
             Synchronize => self.synchronize().await?,
