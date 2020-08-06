@@ -186,7 +186,13 @@ impl EventProcessor {
         match event.action {
             PullRequestEventAction::Synchronize => {
                 if let Some(pr) = self.pulls.get_mut(&event.pull_request.number) {
-                    pr.update_head(event.pull_request.head.sha.clone())
+                    pr.update_head(
+                        event.pull_request.head.sha.clone(),
+                        &self.config,
+                        &self.github,
+                        self.project_board.as_ref(),
+                    )
+                    .await?;
                 }
             }
             PullRequestEventAction::Opened | PullRequestEventAction::Reopened => {

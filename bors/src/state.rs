@@ -157,10 +157,45 @@ impl PullRequestState {
                 .any(|s| self.title.starts_with(s))
     }
 
-    // XXX this should probably update the status of the PR as well, like if the PR is in the queue
-    // to land it should be kicked out
-    pub fn update_head(&mut self, oid: Oid) {
-        self.head_ref_oid = oid;
+    // Update the Head Oid of a PR and kick it out of the queue if the Oid doesn't match the
+    // currently being tested 'merge_oid'
+    pub async fn update_head(
+        &mut self,
+        oid: Oid,
+        config: &RepoConfig,
+        github: &GithubClient,
+        project_board: Option<&ProjectBoard>,
+    ) -> Result<()> {
+        self.head_ref_oid = oid.clone();
+
+        match &self.status {
+            // If the oid we're being updated to is the same as the merge_oid then we don't need to
+            // do anything
+            Status::Testing { merge_oid, .. } | Status::Canary { merge_oid, .. }
+                if merge_oid == &oid => {}
+            Status::InReview => {}
+            _ => {
+                self.update_status(Status::InReview, config, github, project_board)
+                    .await?;
+
+                if let Status::Testing { .. } | Status::Queued = &self.status {
+                    let msg = ":exclamation: Land has been canceled due to this PR being updated with new commits. \
+                    Please issue another Land command if you want to requeue this PR.";
+
+                    github
+                        .issues()
+                        .create_comment(
+                            config.repo().owner(),
+                            config.repo().name(),
+                            self.number,
+                            msg,
+                        )
+                        .await?;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn update_status(
