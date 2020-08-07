@@ -6,7 +6,7 @@ async fn pull_request_event() {
     static PAYLOAD: &str = include_str!("../../test-input/pull-request-event-payload");
     let request = request_from_raw_http(PAYLOAD);
 
-    let mut service = Server::new(vec![]);
+    let mut service = Server::new();
 
     let resp = service.route_github(request).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);

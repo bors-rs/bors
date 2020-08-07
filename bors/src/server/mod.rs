@@ -4,15 +4,11 @@ mod smee_client;
 #[cfg(test)]
 mod test;
 
-pub use self::installation::Installation;
-use self::smee_client::SmeeClient;
+pub use self::{installation::Installation, smee_client::SmeeClient};
 
 use crate::{Error, Result};
 use anyhow::anyhow;
-use futures::{
-    future::{self, FutureExt, TryFutureExt},
-    try_join,
-};
+use futures::future::{self, TryFutureExt};
 use github::{EventType, Webhook, DELIVERY_ID_HEADER, EVENT_TYPE_HEADER, SIGNATURE_HEADER};
 use hyper::{
     body,
@@ -29,41 +25,38 @@ use std::{
         Arc,
     },
 };
+use tokio::sync::RwLock;
 
 const INDEX_HTML: &str = include_str!("../../html/index.html");
 const REPO_HTML: &str = include_str!("../../html/repo.html");
 
-#[derive(Default, Debug)]
-pub struct ServerBuilder {
-    smee: bool,
-    /// smee.io URL
-    smee_url: Option<String>,
-    installations: Vec<Installation>,
+#[derive(Clone, Debug)]
+pub struct Server {
+    counter: Arc<AtomicUsize>,
+    /// Installations which contain various services
+    installations: Arc<RwLock<Vec<Installation>>>,
 }
 
-impl ServerBuilder {
-    pub fn smee(&mut self, smee_url: Option<String>) -> &mut Self {
-        self.smee = true;
-        self.smee_url = smee_url;
-        self
+impl Server {
+    pub fn new() -> Self {
+        Self {
+            counter: Arc::new(AtomicUsize::new(0)),
+            installations: Arc::new(RwLock::new(Vec::new())),
+        }
     }
 
-    pub fn add_installation(&mut self, installation: Installation) -> &mut Self {
-        self.installations.push(installation);
-        self
+    pub async fn add_installation(&mut self, installation: Installation) {
+        self.installations.write().await.push(installation);
     }
 
-    pub async fn serve(self, addr: SocketAddr) -> Result<()> {
-        // Construct the server
-        let server = Server::new(self.installations);
-
+    pub async fn start(self, addr: SocketAddr) -> Result<()> {
         // The closure inside `make_service_fn` is run for each connection,
         // creating a 'service' to handle requests for that specific connection.
         let make_service = make_service_fn(|_socket: &AddrStream| {
             // While the state was moved into the make_service closure,
             // we need to clone it here because this closure is called
             // once for every connection.
-            let server = server.clone();
+            let server = self.clone();
 
             // This is the `Service` that will handle the connection.
             future::ok::<_, Error>(service_fn(move |request| {
@@ -77,38 +70,9 @@ impl ServerBuilder {
             .serve(make_service)
             .map_err(Error::from);
 
-        // spawn the smee client
-        if let Some(smee_uri) = self.smee_url {
-            let smee_client = SmeeClient::with_uri(smee_uri, server.clone());
-            //let smee_handle = tokio::spawn(smee_client.start()).map_err(Error::from);
-            let smee_handle =
-                tokio::spawn(smee_client.start()).map(|join_result| join_result.unwrap());
-            try_join!(hyper_server, smee_handle)?;
-        } else {
-            hyper_server.await?;
-        }
+        hyper_server.await?;
 
         Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Server {
-    counter: Arc<AtomicUsize>,
-    /// Installations which contain various services
-    installations: Arc<Vec<Installation>>,
-}
-
-impl Server {
-    pub fn builder() -> ServerBuilder {
-        ServerBuilder::default()
-    }
-
-    fn new(installations: Vec<Installation>) -> Self {
-        Self {
-            counter: Arc::new(AtomicUsize::new(0)),
-            installations: Arc::new(installations),
-        }
     }
 
     async fn serve(mut self, request: Request<Body>) -> Result<Response<Body>> {
@@ -129,6 +93,8 @@ impl Server {
 
                 let repos = self
                     .installations
+                    .read()
+                    .await
                     .iter()
                     .map(|i| i.config().repo().to_owned())
                     .collect::<Vec<_>>();
@@ -162,7 +128,7 @@ impl Server {
             let mut body = String::new();
             body.push_str("Repositories:\n\n");
 
-            for installation in self.installations.iter() {
+            for installation in self.installations.read().await.iter() {
                 body.push_str(&format!(
                     "{}/{}\n",
                     installation.owner(),
@@ -173,7 +139,7 @@ impl Server {
             return Ok(Response::new(Body::from(body)));
         }
 
-        for installation in self.installations.iter() {
+        for installation in self.installations.read().await.iter() {
             let route = format!(
                 "/repos/{owner}/{repo}/",
                 owner = installation.owner(),
@@ -260,8 +226,9 @@ impl Server {
         };
 
         // XXX Right now we only handle Webhook installations for Repositories
+        let installations = self.installations.read().await;
         if let Some(installation) = event.repository().and_then(|repository| {
-            self.installations
+            installations
                 .iter()
                 .find(|i| i.owner() == repository.owner.login && i.name() == repository.name)
         }) {
