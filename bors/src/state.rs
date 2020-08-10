@@ -175,9 +175,6 @@ impl PullRequestState {
                 if merge_oid == &oid => {}
             Status::InReview => {}
             _ => {
-                self.update_status(Status::InReview, config, github, project_board)
-                    .await?;
-
                 if let Status::Testing { .. } | Status::Queued = &self.status {
                     let msg = ":exclamation: Land has been canceled due to this PR being updated with new commits. \
                     Please issue another Land command if you want to requeue this PR.";
@@ -192,6 +189,9 @@ impl PullRequestState {
                         )
                         .await?;
                 }
+
+                self.update_status(Status::InReview, config, github, project_board)
+                    .await?;
             }
         }
 
