@@ -2,7 +2,7 @@
 
 use crate::{
     config::RepoConfig,
-    event_processor::CommandContext,
+    event_processor::{ActivePullRequestContext, CommandContext},
     project_board::ProjectBoard,
     state::{Priority, Status},
     Result,
@@ -168,33 +168,58 @@ impl Command {
         Ok(is_authorized)
     }
 
-    pub async fn execute(&self, mut ctx: &mut CommandContext<'_>) -> Result<()> {
+    pub async fn execute(&self, ctx: &mut CommandContext<'_>) -> Result<()> {
         info!("Executing command '{}'", self.command_type.name());
 
         match &self.command_type {
-            CommandType::Land(l) => {
-                if let Some(priority) = l.priority() {
-                    Self::set_priority(&mut ctx, priority).await?;
-                }
-                if let Some(squash) = l.squash {
-                    Self::set_squash(&mut ctx, squash).await?;
-                }
-
-                Self::mark_pr_ready_to_land(&mut ctx).await?;
-            }
+            CommandType::Land(l) => Self::execute_land(ctx, l.priority(), l.squash).await?,
             CommandType::Cancel => Self::cancel_land(ctx).await?,
             CommandType::Canary => Self::canary_land(ctx).await?,
             CommandType::Help => {
                 ctx.create_pr_comment(&Help::new(ctx.config(), ctx.project_board()).to_string())
                     .await?
             }
-            CommandType::Priority(p) => Self::set_priority(&mut ctx, p.priority()).await?,
+            CommandType::Priority(p) => Self::execute_priority(ctx, p.priority()).await?,
         }
 
         Ok(())
     }
 
-    async fn set_priority(ctx: &mut CommandContext<'_>, priority: Priority) -> Result<()> {
+    async fn execute_land(
+        ctx: &mut CommandContext<'_>,
+        priority: Option<Priority>,
+        squash: Option<bool>,
+    ) -> Result<()> {
+        let mut ctx = if let Some(ctx) = ctx.active_pull_request_context().await {
+            ctx
+        } else {
+            return Ok(());
+        };
+
+        if let Some(priority) = priority {
+            Self::set_priority(&mut ctx, priority).await?;
+        }
+        if let Some(squash) = squash {
+            Self::set_squash(&mut ctx, squash).await?;
+        }
+
+        Self::mark_pr_ready_to_land(&mut ctx).await
+    }
+
+    async fn execute_priority(ctx: &mut CommandContext<'_>, priority: Priority) -> Result<()> {
+        let mut ctx = if let Some(ctx) = ctx.active_pull_request_context().await {
+            ctx
+        } else {
+            return Ok(());
+        };
+
+        Self::set_priority(&mut ctx, priority).await
+    }
+
+    async fn set_priority(
+        ctx: &mut ActivePullRequestContext<'_>,
+        priority: Priority,
+    ) -> Result<()> {
         info!("#{}: set priority to {:?}", ctx.pr().number, priority);
 
         let high_priority_label = ctx.config().labels().high_priority().to_owned();
@@ -217,7 +242,7 @@ impl Command {
         Ok(())
     }
 
-    async fn set_squash(ctx: &mut CommandContext<'_>, squash: bool) -> Result<()> {
+    async fn set_squash(ctx: &mut ActivePullRequestContext<'_>, squash: bool) -> Result<()> {
         info!("#{}: set squash to {}", ctx.pr().number, squash);
 
         let label = ctx.config().labels().squash().to_owned();
@@ -231,7 +256,7 @@ impl Command {
         Ok(())
     }
 
-    async fn mark_pr_ready_to_land(ctx: &mut CommandContext<'_>) -> Result<()> {
+    async fn mark_pr_ready_to_land(ctx: &mut ActivePullRequestContext<'_>) -> Result<()> {
         info!("attempting to mark pr #{} ReadyToLand", ctx.pr().number);
 
         // Skip marking for land on draft PRs
@@ -299,12 +324,24 @@ impl Command {
     }
 
     async fn cancel_land(ctx: &mut CommandContext<'_>) -> Result<()> {
+        let mut ctx = if let Some(ctx) = ctx.active_pull_request_context().await {
+            ctx
+        } else {
+            return Ok(());
+        };
+
         info!("Canceling land of pr #{}", ctx.pr().number);
 
         ctx.update_pr_status(Status::InReview).await
     }
 
     async fn canary_land(ctx: &mut CommandContext<'_>) -> Result<()> {
+        let mut ctx = if let Some(ctx) = ctx.active_pull_request_context().await {
+            ctx
+        } else {
+            return Ok(());
+        };
+
         info!("Canarying land of pr #{}", ctx.pr().number);
 
         match ctx.pr().status {

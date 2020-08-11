@@ -386,6 +386,7 @@ impl EventProcessor {
 
     fn command_context<'a>(&'a mut self, sender: &'a str, pr_number: u64) -> CommandContext<'a> {
         CommandContext {
+            number: pr_number,
             pull_request: self.pulls.get_mut(&pr_number),
             github: &self.github,
             config: &self.config,
@@ -417,12 +418,10 @@ impl EventProcessor {
                     .add_reaction(node_id, github::ReactionType::Rocket)
                     .await?;
 
-                if self.pulls.get(&pr_number).is_some() {
-                    let mut ctx = self.command_context(user, pr_number);
-                    // Check if the user is authorized before executing the command
-                    if command.is_authorized(&ctx).await? {
-                        command.execute(&mut ctx).await?;
-                    }
+                let mut ctx = self.command_context(user, pr_number);
+                // Check if the user is authorized before executing the command
+                if command.is_authorized(&ctx).await? {
+                    command.execute(&mut ctx).await?;
                 }
             }
             Some(Err(_)) => {
@@ -558,8 +557,76 @@ impl EventProcessor {
     }
 }
 
+pub struct ActivePullRequestContext<'a> {
+    pull_request: &'a mut PullRequestState,
+    github: &'a GithubClient,
+    config: &'a RepoConfig,
+    project_board: Option<&'a ProjectBoard>,
+    sender: &'a str,
+}
+
+impl<'a> ActivePullRequestContext<'a> {
+    pub fn pr(&self) -> &PullRequestState {
+        &self.pull_request
+    }
+
+    pub fn pr_mut(&mut self) -> &mut PullRequestState {
+        &mut self.pull_request
+    }
+
+    pub fn github(&self) -> &GithubClient {
+        &self.github
+    }
+
+    pub fn config(&self) -> &RepoConfig {
+        &self.config
+    }
+
+    #[allow(dead_code)]
+    pub fn project_board(&self) -> Option<&'a ProjectBoard> {
+        self.project_board
+    }
+
+    pub fn sender(&self) -> &str {
+        &self.sender
+    }
+
+    pub async fn create_pr_comment(&self, body: &str) -> Result<()> {
+        self.github()
+            .issues()
+            .create_comment(
+                self.config().owner(),
+                self.config().name(),
+                self.pr().number,
+                body,
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_pr_status(&mut self, status: Status) -> Result<()> {
+        self.pull_request
+            .update_status(status, self.config, self.github, self.project_board)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn set_label(&mut self, label: &str) -> Result<()> {
+        self.pull_request
+            .add_label(self.config, self.github, label)
+            .await
+    }
+
+    pub async fn remove_label(&mut self, label: &str) -> Result<()> {
+        self.pull_request
+            .remove_label(self.config, self.github, label)
+            .await
+    }
+}
+
 pub struct CommandContext<'a> {
-    //number: u64,
+    number: u64,
     pull_request: Option<&'a mut PullRequestState>,
     github: &'a GithubClient,
     config: &'a RepoConfig,
@@ -568,13 +635,41 @@ pub struct CommandContext<'a> {
 }
 
 impl<'a> CommandContext<'a> {
-    pub fn pr(&self) -> &PullRequestState {
-        self.pull_request.as_ref().unwrap()
+    pub async fn active_pull_request_context(&mut self) -> Option<ActivePullRequestContext<'_>> {
+        if self.pull_request.is_none() {
+            let msg = format!(
+                "@{} :exclamation: Unable to run the provided command on a closed PR",
+                self.sender(),
+            );
+            // Ignore the result from posting the comment
+            let _ = self.create_pr_comment(&msg).await;
+        }
+
+        if let Some(pull_request) = &mut self.pull_request {
+            Some(ActivePullRequestContext {
+                pull_request,
+                github: self.github,
+                config: self.config,
+                project_board: self.project_board,
+                sender: self.sender,
+            })
+        } else {
+            None
+        }
     }
 
-    #[allow(unused)]
-    pub fn pr_mut(&mut self) -> &mut PullRequestState {
-        self.pull_request.as_mut().unwrap()
+    pub fn number(&self) -> u64 {
+        self.number
+    }
+
+    #[allow(dead_code)]
+    pub fn pr(&self) -> Option<&PullRequestState> {
+        self.pull_request.as_deref()
+    }
+
+    #[allow(dead_code)]
+    pub fn pr_mut(&mut self) -> Option<&mut PullRequestState> {
+        self.pull_request.as_deref_mut()
     }
 
     pub fn github(&self) -> &GithubClient {
@@ -593,51 +688,16 @@ impl<'a> CommandContext<'a> {
         &self.sender
     }
 
-    #[allow(unused)]
-    pub fn sender_is_author(&self) -> bool {
-        if let Some(author) = &self.pr().author {
-            author == self.sender
-        } else {
-            false
-        }
-    }
-
     pub async fn create_pr_comment(&self, body: &str) -> Result<()> {
         self.github()
             .issues()
             .create_comment(
                 self.config().owner(),
                 self.config().name(),
-                self.pr().number,
+                self.number(),
                 body,
             )
             .await?;
         Ok(())
-    }
-
-    pub async fn update_pr_status(&mut self, status: Status) -> Result<()> {
-        self.pull_request
-            .as_mut()
-            .unwrap()
-            .update_status(status, self.config, self.github, self.project_board)
-            .await?;
-
-        Ok(())
-    }
-
-    pub async fn set_label(&mut self, label: &str) -> Result<()> {
-        self.pull_request
-            .as_mut()
-            .unwrap()
-            .add_label(self.config, self.github, label)
-            .await
-    }
-
-    pub async fn remove_label(&mut self, label: &str) -> Result<()> {
-        self.pull_request
-            .as_mut()
-            .unwrap()
-            .remove_label(self.config, self.github, label)
-            .await
     }
 }
