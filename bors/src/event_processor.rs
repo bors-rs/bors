@@ -388,6 +388,7 @@ impl EventProcessor {
         CommandContext {
             number: pr_number,
             pull_request: self.pulls.get_mut(&pr_number),
+            repo: &mut self.git_repository,
             github: &self.github,
             config: &self.config,
             project_board: self.project_board.as_ref(),
@@ -630,6 +631,7 @@ pub struct CommandContext<'a> {
     pull_request: Option<&'a mut PullRequestState>,
     github: &'a GithubClient,
     config: &'a RepoConfig,
+    repo: &'a mut GitRepository,
     project_board: Option<&'a ProjectBoard>,
     sender: &'a str,
 }
@@ -670,6 +672,10 @@ impl<'a> CommandContext<'a> {
     #[allow(dead_code)]
     pub fn pr_mut(&mut self) -> Option<&mut PullRequestState> {
         self.pull_request.as_deref_mut()
+    }
+
+    pub fn git_repository(&mut self) -> &mut GitRepository {
+        &mut self.repo
     }
 
     pub fn github(&self) -> &GithubClient {

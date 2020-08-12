@@ -384,4 +384,8 @@ impl Repo {
     pub fn to_github_ssh_url(&self) -> String {
         format!("git@github.com:{}/{}.git", self.owner, self.name)
     }
+
+    pub fn to_github_https_url(&self) -> String {
+        format!("https://github.com/{}/{}.git", self.owner, self.name)
+    }
 }
