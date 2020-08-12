@@ -149,6 +149,30 @@ impl GitRepository {
         }
     }
 
+    pub fn fetch_and_cherry_pick(
+        &mut self,
+        target_ref: &str,
+        branch: &str,
+        base_oid: &Oid,
+        head_oid: &Oid,
+    ) -> Result<Option<Oid>> {
+        self.fetch(target_ref, head_oid)?;
+        let target_oid = self.git().ref_to_oid(&format!("origin/{}", target_ref))?;
+        // Create branch to work on for the cherry-pick
+        self.git().create_branch(branch, &target_oid)?;
+
+        // Attempt the cherry-pick
+        if let Err(e) = self.git().cherry_pick(base_oid, head_oid) {
+            info!("chery-pick failed: {}", e);
+
+            self.git().cherry_pick_abort()?;
+            Ok(None)
+        } else {
+            let head_oid = self.git().head_oid()?;
+            Ok(Some(head_oid))
+        }
+    }
+
     fn git(&self) -> Git {
         Git::new()
             .current_dir(&self.directory)
@@ -305,6 +329,20 @@ impl Git {
             self.inner.arg("--exec");
             self.inner.arg(exec);
         }
+
+        self.run()?;
+        Ok(())
+    }
+
+    pub fn cherry_pick_abort(mut self) -> Result<()> {
+        self.inner.args(&["cherry-pick", "--abort"]);
+        self.run()?;
+        Ok(())
+    }
+
+    pub fn cherry_pick(mut self, base_oid: &Oid, head_oid: &Oid) -> Result<()> {
+        self.inner.args(&["cherry-pick"]);
+        self.inner.arg(format!("{}..{}", base_oid, head_oid));
 
         self.run()?;
         Ok(())

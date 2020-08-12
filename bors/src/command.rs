@@ -7,6 +7,7 @@ use crate::{
     state::{Priority, Status},
     Result,
 };
+use github::client::NewPullRequest;
 use log::info;
 use thiserror::Error;
 
@@ -25,6 +26,7 @@ enum CommandType {
     Land(Land),
     Cancel,
     Canary,
+    CherryPick(CherryPick),
     Help,
     Priority(PriorityCommand),
 }
@@ -35,6 +37,7 @@ impl CommandType {
             CommandType::Land(_) => "Land",
             CommandType::Cancel => "Cancel",
             CommandType::Canary => "Canary",
+            CommandType::CherryPick(_) => "CherryPick",
             CommandType::Help => "Help",
             CommandType::Priority(_) => "Priority",
         }
@@ -119,6 +122,7 @@ impl Command {
             "land" | "merge" => CommandType::Land(Land::with_args(args)?),
             "cancel" | "stop" => CommandType::Cancel,
             "canary" | "try" => CommandType::Canary,
+            "cherry" | "cherry-pick" => CommandType::CherryPick(CherryPick::with_args(args)?),
             "help" | "h" => CommandType::Help,
             "priority" => CommandType::Priority(PriorityCommand::with_args(args)?),
 
@@ -175,6 +179,7 @@ impl Command {
             CommandType::Land(l) => Self::execute_land(ctx, l.priority(), l.squash).await?,
             CommandType::Cancel => Self::cancel_land(ctx).await?,
             CommandType::Canary => Self::canary_land(ctx).await?,
+            CommandType::CherryPick(c) => Self::cherry_pick(ctx, c.target()).await?,
             CommandType::Help => {
                 ctx.create_pr_comment(&Help::new(ctx.config(), ctx.project_board()).to_string())
                     .await?
@@ -359,6 +364,97 @@ impl Command {
                     .await?;
             }
         }
+
+        Ok(())
+    }
+
+    async fn cherry_pick(ctx: &mut CommandContext<'_>, target: &str) -> Result<()> {
+        // Check if target is a valid branch
+        if ctx.git_repository().fetch_ref(target).is_err() {
+            info!("invalid cherry-pick target: '{}'", target);
+            let msg = format!(
+                "@{} :exclamation: '{}' is an invalid branch target for cherry-picking",
+                ctx.sender(),
+                target,
+            );
+            ctx.create_pr_comment(&msg).await?;
+            return Ok(());
+        }
+
+        // Get Commit range from PR
+        let pull = ctx
+            .github()
+            .pulls()
+            .get(ctx.config().owner(), ctx.config().name(), ctx.number())
+            .await?
+            .into_inner();
+        let base_oid = pull.base.sha;
+        let head_oid = pull.head.sha;
+
+        let branch = format!("pick/{}/{}", ctx.number(), target);
+
+        if ctx
+            .git_repository()
+            .fetch_and_cherry_pick(target, &branch, &base_oid, &head_oid)?
+            .is_none()
+        {
+            let msg = format!(
+                "@{} :exclamation: cherry-pick failed, possibly due to conflicts. \
+                You can perform the cherry-pick yourself by running the following commands:\n\
+                ```\n\
+                git fetch {url} {target} {head_oid}\n\
+                git checkout {target}\n\
+                git cherry-pick {base_oid}..{head_oid}\n\
+                ```\n\
+                ",
+                ctx.sender(),
+                url = ctx.config().repo().to_github_https_url(),
+                target = target,
+                head_oid = head_oid,
+                base_oid = base_oid,
+            );
+            ctx.create_pr_comment(&msg).await?;
+
+            return Ok(());
+        }
+
+        // Push branch and open pull request
+        ctx.git_repository().push_branch(&branch)?;
+        info!("pushed '{}' branch", branch);
+
+        let title = format!("Cherry-pick PR #{} into {}", ctx.number(), target);
+        let body = format!(
+            "This cherry-pick was triggerd by a request on #{}\n\
+            Please review the diff to ensure there are not any unexpected changes.\n\
+            \n\
+            cc @{}",
+            ctx.number(),
+            ctx.sender()
+        );
+
+        let request = NewPullRequest {
+            title,
+            body: Some(body),
+            head: branch.to_owned(),
+            base: target.to_owned(),
+            maintainer_can_modify: Some(true),
+            draft: Some(false),
+        };
+
+        let new_pull = ctx
+            .github()
+            .pulls()
+            .create(ctx.config().owner(), ctx.config().name(), request)
+            .await?
+            .into_inner();
+
+        let msg = format!(
+            "@{} :cherries:  Opened PR #{} to cherry-pick these changes into {}",
+            ctx.sender(),
+            new_pull.number,
+            target
+        );
+        ctx.create_pr_comment(&msg).await?;
 
         Ok(())
     }
@@ -584,5 +680,41 @@ impl PriorityCommand {
 
     fn priority(&self) -> Priority {
         self.priority
+    }
+}
+
+#[derive(Debug)]
+struct CherryPick {
+    target: String,
+}
+
+impl CherryPick {
+    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
+    where
+        I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
+    {
+        let mut iter = iter.into_iter();
+
+        let arg = iter
+            .next()
+            .and_then(|(k, v)| if v.is_some() { None } else { Some(k) });
+
+        Self::from_arg(arg)
+    }
+
+    fn from_arg(value: Option<&str>) -> Result<Self, ParseCommnadError> {
+        if let Some(v) = value {
+            Ok(Self {
+                target: v.to_owned(),
+            })
+        } else {
+            // No value specified
+            //TODO better error message
+            Err(ParseCommnadError)
+        }
+    }
+
+    fn target(&self) -> &str {
+        &self.target
     }
 }

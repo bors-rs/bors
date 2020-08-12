@@ -32,7 +32,8 @@ pub use project::{
     ProjectClient, UpdateProjectRequest,
 };
 pub use pulls::{
-    ListPullsOptions, MergeMethod, MergePullRequest, MergePullRequestResponse, PullsClient,
+    ListPullsOptions, MergeMethod, MergePullRequest, MergePullRequestResponse, NewPullRequest,
+    PullsClient,
 };
 pub use rate_limit::{Rate, RateLimitClient, RateLimits};
 pub use reactions::ReactionsClient;
