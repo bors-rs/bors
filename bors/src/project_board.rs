@@ -38,7 +38,7 @@ impl ProjectBoard {
         if let Some(card_id) = pull.project_card_id {
             let column_id = match &pull.status {
                 Status::InReview => self.review_column.id,
-                Status::Queued => self.queued_column.id,
+                Status::Queued(_) => self.queued_column.id,
                 Status::Testing { .. } => self.testing_column.id,
                 Status::Canary { .. } => self.canary_column.id,
             };

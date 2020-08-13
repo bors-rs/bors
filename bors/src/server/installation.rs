@@ -1,7 +1,6 @@
 use crate::{
     config::RepoConfig,
     event_processor::EventProcessorSender,
-    queue::QueueEntry,
     state::{Priority, PullRequestState},
 };
 use github::Event;
@@ -53,9 +52,7 @@ impl Installation {
         let (_queue, pulls) = self.event_processor.get_state().await.unwrap();
 
         let mut pulls = pulls.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
-        pulls.sort_unstable_by_key(|p| {
-            QueueEntry::new(p.number, p.status.status_type(), p.priority(self.config()))
-        });
+        pulls.sort_unstable_by_key(|p| p.to_queue_entry(self.config()));
         pulls
     }
 
@@ -100,7 +97,7 @@ impl LiquidPullRequest {
         use crate::state::Status;
         let status = match pr.status {
             Status::InReview => "",
-            Status::Queued => "queued",
+            Status::Queued(_) => "queued",
             Status::Testing { .. } => "testing",
             Status::Canary { .. } => "canary",
         };

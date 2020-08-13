@@ -321,7 +321,7 @@ impl EventProcessor {
                 Status::Testing { merge_oid, .. } | Status::Canary { merge_oid, .. } => {
                     merge_oid == oid
                 }
-                Status::InReview | Status::Queued => false,
+                Status::InReview | Status::Queued(_) => false,
             })
             .map(|(_n, pr)| pr)
     }

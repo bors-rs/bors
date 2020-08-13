@@ -290,7 +290,7 @@ impl Command {
                 }
 
                 if ctx.pr().approved || !ctx.config().require_review() {
-                    ctx.update_pr_status(Status::Queued).await?;
+                    ctx.update_pr_status(Status::queued()).await?;
                     info!("pr #{} queued for landing", ctx.pr().number);
                 } else {
                     info!(
@@ -305,7 +305,7 @@ impl Command {
                     ctx.create_pr_comment(&msg).await?;
                 }
             }
-            Status::Queued | Status::Testing { .. } => {
+            Status::Queued(_) | Status::Testing { .. } => {
                 info!("pr #{} already queued for landing", ctx.pr().number);
 
                 let msg = format!(
@@ -351,7 +351,7 @@ impl Command {
 
         match ctx.pr().status {
             Status::InReview => ctx.pr_mut().canary_requested = true,
-            Status::Queued | Status::Testing { .. } => {
+            Status::Queued(_) | Status::Testing { .. } => {
                 let msg = format!(
                     "@{} :bulb: This PR is currently queued for landing, cancel first if you want to canary the landing",
                     ctx.sender(),

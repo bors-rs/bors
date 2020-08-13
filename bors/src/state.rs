@@ -1,4 +1,7 @@
-use crate::{config::RepoConfig, graphql::GithubClient, project_board::ProjectBoard, Result};
+use crate::{
+    config::RepoConfig, graphql::GithubClient, project_board::ProjectBoard, queue::QueueEntry,
+    Result,
+};
 use github::Oid;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -55,7 +58,7 @@ pub enum StatusType {
 #[derive(Clone, Debug)]
 pub enum Status {
     InReview,
-    Queued,
+    Queued(std::time::Instant),
     Testing {
         merge_oid: Oid,
         tests_started_at: std::time::Instant,
@@ -78,7 +81,7 @@ pub enum Status {
 
 impl Status {
     pub fn is_queued(&self) -> bool {
-        matches!(self, Status::Queued)
+        matches!(self, Status::Queued(_))
     }
 
     pub fn is_testing(&self) -> bool {
@@ -87,6 +90,10 @@ impl Status {
 
     pub fn is_canary(&self) -> bool {
         matches!(self, Status::Canary { .. })
+    }
+
+    pub fn queued() -> Status {
+        Status::Queued(std::time::Instant::now())
     }
 
     pub fn testing(merge_oid: Oid) -> Status {
@@ -108,7 +115,7 @@ impl Status {
     pub fn status_type(&self) -> StatusType {
         match self {
             Status::InReview => StatusType::InReview,
-            Status::Queued => StatusType::Queued,
+            Status::Queued(_) => StatusType::Queued,
             Status::Testing { .. } => StatusType::Testing,
             Status::Canary { .. } => StatusType::Canary,
         }
@@ -175,7 +182,7 @@ impl PullRequestState {
                 if merge_oid == &oid => {}
             Status::InReview => {}
             _ => {
-                if let Status::Testing { .. } | Status::Queued = &self.status {
+                if let Status::Testing { .. } | Status::Queued(_) = &self.status {
                     let msg = ":exclamation: Land has been canceled due to this PR being updated with new commits. \
                     Please issue another Land command if you want to requeue this PR.";
 
@@ -287,6 +294,26 @@ impl PullRequestState {
                 },
             );
         }
+    }
+
+    pub fn to_queue_entry(&self, config: &RepoConfig) -> QueueEntry {
+        let timestamp = match &self.status {
+            Status::InReview => None,
+            Status::Queued(timestamp) => Some(*timestamp),
+            Status::Testing {
+                tests_started_at, ..
+            }
+            | Status::Canary {
+                tests_started_at, ..
+            } => Some(*tests_started_at),
+        };
+
+        QueueEntry::new(
+            self.number,
+            self.status.status_type(),
+            self.priority(config),
+            timestamp,
+        )
     }
 }
 
