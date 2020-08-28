@@ -1,10 +1,12 @@
 [github]
 # Github API token used for interacting with the Github web API
+# requires creating personal access token with Full `repo` scope
 github-api-token = ""
 
 [git]
 
 # file where an SSH private key lives, needed for fetching/pushing
+# corresponding public key must be added to github account
 ssh-key-file = ""
 
 # The name+email used for creating commits
