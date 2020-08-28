@@ -5,7 +5,7 @@
     "pull_request_review_id": 322698048,
     "id": 350518292,
     "node_id": "MDI0OlB1bGxSZXF1ZXN0UmV2aWV3Q29tbWVudDM1MDUxODI5Mg==",
-    "diff_hunk": "@@ -0,0 +1,33 @@\n+//! Defines commands which can be asked to be performed\n+use std::str::FromStr;\n+use thiserror::Error;\n+\n+#[derive(Debug)]\n+pub struct Command {\n+    cmd: String,\n+}\n+\n+impl Command {\n+    pub fn from_comment(c: &str) -> Option<Result<Self, ParseCommnadError>> {\n+        c.lines()\n+            .find(|line| line.starts_with(\"/\"))\n+            .map(FromStr::from_str)\n+    }\n+}\n+\n+#[derive(Error, Debug)]\n+#[error(\"invalid command\")]\n+pub struct ParseCommnadError;\n+\n+impl FromStr for Command {",
+    "diff_hunk": "@@ -0,0 +1,33 @@\n+//! Defines commands which can be asked to be performed\n+use std::str::FromStr;\n+use thiserror::Error;\n+\n+#[derive(Debug)]\n+pub struct Command {\n+    cmd: String,\n+}\n+\n+impl Command {\n+    pub fn from_comment(c: &str) -> Option<Result<Self, ParseCommandError>> {\n+        c.lines()\n+            .find(|line| line.starts_with(\"/\"))\n+            .map(FromStr::from_str)\n+    }\n+}\n+\n+#[derive(Error, Debug)]\n+#[error(\"invalid command\")]\n+pub struct ParseCommandError;\n+\n+impl FromStr for Command {",
     "path": "src/command.rs",
     "position": 22,
     "original_position": 22,
