@@ -217,6 +217,9 @@ impl Git {
         } else {
             std::env::current_dir().unwrap().join(ssh_key_file)
         };
+        if !path.is_file() {
+            panic!("SSH Key File is not a file")
+        };
         self.inner.env(
             "GIT_SSH_COMMAND",
             format!("ssh -i {} -S none -o 'IdentitiesOnly true'", path.display()),
