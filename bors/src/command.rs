@@ -13,7 +13,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 #[error("invalid command")]
-pub struct ParseCommnadError;
+pub struct ParseCommandError;
 
 #[derive(Debug)]
 pub struct Command {
@@ -45,7 +45,7 @@ impl CommandType {
 }
 
 impl Command {
-    pub fn from_comment(c: &str) -> Option<Result<Self, ParseCommnadError>> {
+    pub fn from_comment(c: &str) -> Option<Result<Self, ParseCommandError>> {
         c.lines()
             .find(|line| line.starts_with('/'))
             .map(Self::from_line)
@@ -55,15 +55,15 @@ impl Command {
     pub fn from_comment_with_username(
         c: &str,
         my_username: &str,
-    ) -> Option<Result<Self, ParseCommnadError>> {
+    ) -> Option<Result<Self, ParseCommandError>> {
         c.lines()
             .find(|line| Self::line_starts_with_username(line, my_username))
             .map(|line| Self::from_line_with_username(line, my_username))
     }
 
-    fn from_line_with_username(s: &str, my_username: &str) -> Result<Self, ParseCommnadError> {
+    fn from_line_with_username(s: &str, my_username: &str) -> Result<Self, ParseCommandError> {
         if !Self::line_starts_with_username(s, my_username) {
-            return Err(ParseCommnadError);
+            return Err(ParseCommandError);
         }
 
         let command_type = Self::from_iter(s.split_whitespace().skip(1))?;
@@ -84,9 +84,9 @@ impl Command {
         false
     }
 
-    fn from_line(s: &str) -> Result<Self, ParseCommnadError> {
+    fn from_line(s: &str) -> Result<Self, ParseCommandError> {
         if !s.starts_with('/') {
-            return Err(ParseCommnadError);
+            return Err(ParseCommandError);
         }
 
         let command_type = Self::from_iter(s[1..].split_whitespace())?;
@@ -97,7 +97,7 @@ impl Command {
         })
     }
 
-    fn from_iter<'a, I>(iter: I) -> Result<CommandType, ParseCommnadError>
+    fn from_iter<'a, I>(iter: I) -> Result<CommandType, ParseCommandError>
     where
         I: IntoIterator<Item = &'a str>,
     {
@@ -106,7 +106,7 @@ impl Command {
         let command_name = if let Some(name) = iter.next() {
             name
         } else {
-            return Err(ParseCommnadError);
+            return Err(ParseCommandError);
         };
 
         // Arguments take the form of `<key>=<value>`
@@ -126,7 +126,7 @@ impl Command {
             "help" | "h" => CommandType::Help,
             "priority" => CommandType::Priority(PriorityCommand::with_args(args)?),
 
-            _ => return Err(ParseCommnadError),
+            _ => return Err(ParseCommandError),
         };
 
         Ok(command_type)
@@ -638,7 +638,7 @@ struct Land {
 }
 
 impl Land {
-    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
+    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommandError>
     where
         I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
     {
@@ -676,7 +676,7 @@ struct PriorityCommand {
 }
 
 impl PriorityCommand {
-    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
+    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommandError>
     where
         I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
     {
@@ -689,15 +689,15 @@ impl PriorityCommand {
         Self::from_arg(arg)
     }
 
-    fn from_arg(value: Option<&str>) -> Result<Self, ParseCommnadError> {
+    fn from_arg(value: Option<&str>) -> Result<Self, ParseCommandError> {
         if let Some(v) = value {
             //TODO better error message (expected integer)
-            let priority = v.parse().map_err(|_| ParseCommnadError)?;
+            let priority = v.parse().map_err(|_| ParseCommandError)?;
             Ok(Self { priority })
         } else {
             // No value specified
             //TODO better error message
-            Err(ParseCommnadError)
+            Err(ParseCommandError)
         }
     }
 
@@ -712,7 +712,7 @@ struct CherryPick {
 }
 
 impl CherryPick {
-    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommnadError>
+    fn with_args<'a, I>(iter: I) -> Result<Self, ParseCommandError>
     where
         I: IntoIterator<Item = (&'a str, Option<&'a str>)>,
     {
@@ -725,7 +725,7 @@ impl CherryPick {
         Self::from_arg(arg)
     }
 
-    fn from_arg(value: Option<&str>) -> Result<Self, ParseCommnadError> {
+    fn from_arg(value: Option<&str>) -> Result<Self, ParseCommandError> {
         if let Some(v) = value {
             Ok(Self {
                 target: v.to_owned(),
@@ -733,7 +733,7 @@ impl CherryPick {
         } else {
             // No value specified
             //TODO better error message
-            Err(ParseCommnadError)
+            Err(ParseCommandError)
         }
     }
 
