@@ -111,13 +111,14 @@ impl GitRepository {
             // Get the first commit in the PR
             let oid = self.git().get_first_commit(base_oid, head_oid)?;
 
-            // This shouldn't result in a merge conflict since we're just rewording each commit
-            // message in the series
-            self.git().rebase(
-                &oid,
-                false,
-                Some(format!("git commit --amend --fixup={}", oid)),
-            )?;
+            // squash all commits
+            self.git()
+                .rebase(
+                    &oid,
+                    false,
+                    Some(format!("git commit --amend --fixup={}", oid)),
+                )
+                .or_else(|e| self.git().rebase_abort().map_err(|err| err.context(e)))?;
         }
 
         // Attempt to perform the rebase
