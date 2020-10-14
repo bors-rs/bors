@@ -293,14 +293,16 @@ impl EventProcessor {
                     if body != pull.body {
                         pull.body = body.to_owned();
                     }
-                    if !matches!(pull.status, Status::Testing { .. })
-                        && event.pull_request.base.git_ref != pull.base_ref_name
-                    {
-                        pull.base_ref_name = event.pull_request.base.git_ref.clone();
-                    }
-                    if event.pull_request.base.sha != pull.base_ref_oid {
-                        pull.base_ref_oid = event.pull_request.base.sha.clone();
-                    }
+
+                    pull.update_base_ref(
+                        &event.pull_request.base.git_ref,
+                        &event.pull_request.base.sha,
+                        &self.config,
+                        &self.github,
+                        self.project_board.as_ref(),
+                    )
+                    .await?;
+
                     if let Some(maintainer_can_modify) = event.pull_request.maintainer_can_modify {
                         pull.maintainer_can_modify = maintainer_can_modify;
                     }

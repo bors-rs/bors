@@ -205,6 +205,55 @@ impl PullRequestState {
         Ok(())
     }
 
+    // Update the base ref of a PR and kick it out of the queue if it doesn't match the
+    // currently being tested 'base_ref_name'
+    pub async fn update_base_ref(
+        &mut self,
+        base_ref_name: &str,
+        base_ref_oid: &Oid,
+        config: &RepoConfig,
+        github: &GithubClient,
+        project_board: Option<&ProjectBoard>,
+    ) -> Result<()> {
+        let mut changed = false;
+        if self.base_ref_name != base_ref_name {
+            self.base_ref_name = base_ref_name.to_owned();
+            changed = true;
+        }
+        if self.base_ref_oid != *base_ref_oid {
+            self.base_ref_oid = base_ref_oid.to_owned();
+            changed = true;
+        }
+
+        // If the base ref or base oid changed and the PR had already been queued or begun testing
+        // we need to kick it out in order to make sure that it lands on the correct base
+        if changed
+            && matches!(
+                self.status.status_type(),
+                StatusType::Testing | StatusType::Queued
+            )
+        {
+            let msg =
+                ":exclamation: Land has been canceled due to this PR's base ref being changed. \
+                Please issue another Land command if you want to requeue this PR.";
+
+            github
+                .issues()
+                .create_comment(
+                    config.repo().owner(),
+                    config.repo().name(),
+                    self.number,
+                    msg,
+                )
+                .await?;
+
+            self.update_status(Status::InReview, config, github, project_board)
+                .await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn update_status(
         &mut self,
         status: Status,
