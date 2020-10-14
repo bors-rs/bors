@@ -107,7 +107,7 @@ impl GitRepository {
         // First create the branch to work on for the rebase
         self.git().create_branch(branch, head_oid)?;
 
-        if fixup_all {
+        if fixup_all && self.git().number_of_commits(base_oid, head_oid)? > 1 {
             // Get the first commit in the PR
             let oid = self.git().get_first_commit(base_oid, head_oid)?;
 
@@ -362,6 +362,14 @@ impl Git {
             .last()
             .ok_or_else(|| anyhow!("unable to query first commit in series"))?;
         Ok(Oid::from_str(first.trim()))
+    }
+
+    pub fn number_of_commits(mut self, base_oid: &Oid, head_oid: &Oid) -> Result<usize> {
+        self.inner
+            .arg("rev-list")
+            .arg(&format!("{}..{}", base_oid, head_oid));
+        let output = self.run()?;
+        Ok(output.lines().count())
     }
 
     pub fn head_oid(self) -> Result<Oid> {
