@@ -94,51 +94,46 @@ impl MergeQueue {
                         pull.number, pull.maintainer_can_modify
                     );
 
-                    pull.update_status(Status::InReview, config, github, project_board)
-                        .await?;
-
                     let comment =
-                    ":exclamation: failed to update PR in-place; halting merge.\n\
-                    Make sure that that [\"Allow edits from maintainers\"]\
+                    ":exclamation: failed to update PR in-place. When this PR is merged Github will improperly mark it as \"Closed\" instead of \"Merged\".\n\
+                    In the future make sure that that [\"Allow edits from maintainers\"]\
                     (https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/allowing-changes-to-a-pull-request-branch-created-from-a-fork) \
-                    is enabled before attempting to reland this PR.";
+                    is enabled, allowing Bors to update the PR in-place before merging and convince Github to mark the PR as \"Merged\".";
 
                     github
                         .issues()
                         .create_comment(config.owner(), config.name(), pull.number, &comment)
                         .await?;
+                } else {
+                    // TODO we probably shouldn't spin waiting here. It might be better to wait till we
+                    // get a webhook back from Github that the PR was updated
+                    let r = format!("refs/pull/{}/head", pull.number);
+                    for i in 0..15 {
+                        info!(
+                            "Waiting for Github to update its ref '{}': attempt {}",
+                            r, i
+                        );
 
-                    return Ok(());
-                }
+                        // Delay a few seconds to try and let Github properly update its references
+                        tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
 
-                // TODO we probably shouldn't spin waiting here. It might be better to wait till we
-                // get a webhook back from Github that the PR was updated
-                let r = format!("refs/pull/{}/head", pull.number);
-                for i in 0..15 {
-                    info!(
-                        "Waiting for Github to update its ref '{}': attempt {}",
-                        r, i
-                    );
+                        let github = github
+                            .pulls()
+                            .get(config.owner(), config.name(), pull.number)
+                            .await
+                            .map(|p| p.into_inner().head.sha);
+                        let git = repo.fetch_ref(&r);
 
-                    // Delay a few seconds to try and let Github properly update its references
-                    tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
-
-                    let github = github
-                        .pulls()
-                        .get(config.owner(), config.name(), pull.number)
-                        .await
-                        .map(|p| p.into_inner().head.sha);
-                    let git = repo.fetch_ref(&r);
-
-                    match (git, github) {
-                        (Ok(git), Ok(github)) => {
-                            if merge_oid == &git && merge_oid == &github {
-                                info!("Github's ref '{}' has been updated", r);
-                                break;
+                        match (git, github) {
+                            (Ok(git), Ok(github)) => {
+                                if merge_oid == &git && merge_oid == &github {
+                                    info!("Github's ref '{}' has been updated", r);
+                                    break;
+                                }
                             }
-                        }
-                        (git, github) => {
-                            info!("Github's ref's haven't updated yet.\nExpected: '{}'\nActual: git '{:?}' github '{:?}'", merge_oid, git, github);
+                            (git, github) => {
+                                info!("Github's ref's haven't updated yet.\nExpected: '{}'\nActual: git '{:?}' github '{:?}'", merge_oid, git, github);
+                            }
                         }
                     }
                 }
