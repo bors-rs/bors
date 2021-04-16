@@ -28,7 +28,7 @@ impl SmeeClient {
         // If there are any errors with the stream, log and restart the client
         while let Err(e) = self.run().await {
             warn!("Smee Error: {:?}", e);
-            tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         }
 
         Ok(())
@@ -122,7 +122,7 @@ impl<'b> SmeeEventParser<'b> {
 
             if let Some(data) = self.body.chunk().await? {
                 //let data = data?;
-                self.buffer.extend_from_slice(data.bytes());
+                self.buffer.extend_from_slice(data.chunk());
             } else {
                 return Ok(None);
             }

@@ -478,7 +478,7 @@ impl EventProcessor {
                         "Before PR: {} Query: {} Review State: {:?}",
                         pr.approved, approved, e.review.state
                     );
-                    tokio::time::delay_for(std::time::Duration::from_millis(300)).await;
+                    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
                     approved = self
                         .github
                         .get_review_decision(
