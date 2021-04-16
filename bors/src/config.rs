@@ -32,6 +32,16 @@ pub struct GitConfig {
 #[serde(rename_all = "kebab-case")]
 pub struct GithubConfig {
     pub github_api_token: String,
+    pub webhook_secret: Option<String>,
+    // app_id
+    // client_id = ""
+    // client_secret = ""
+}
+
+impl GithubConfig {
+    pub fn webhook_secret(&self) -> Option<&str> {
+        self.webhook_secret.as_deref()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -40,9 +50,6 @@ pub struct RepoConfig {
     /// The repo this config pertains to: (Owner, Name)
     #[serde(flatten)]
     repo: Repo,
-
-    /// The webhook secret configured for this repository
-    secret: Option<String>,
 
     /// Indicates if an approving Github review is required
     #[serde(default)]
@@ -79,10 +86,6 @@ impl RepoConfig {
 
     pub fn name(&self) -> &str {
         &self.repo.name()
-    }
-
-    pub fn secret(&self) -> Option<&str> {
-        self.secret.as_deref()
     }
 
     pub fn require_review(&self) -> bool {

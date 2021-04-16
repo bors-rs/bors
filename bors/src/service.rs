@@ -19,7 +19,7 @@ pub struct ServeOptions {
 
 pub async fn run_serve(config: Config, options: &ServeOptions) -> Result<()> {
     let mut tasks = Vec::new();
-    let server = Server::new();
+    let server = Server::new(config.github.clone());
 
     // Start up the server and optionally a smee client
     let addr = ([0, 0, 0, 0], options.port).into();

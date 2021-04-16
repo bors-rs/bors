@@ -6,7 +6,7 @@ mod test;
 
 pub use self::{installation::Installation, smee_client::SmeeClient};
 
-use crate::{Error, Result};
+use crate::{config::GithubConfig, Error, Result};
 use anyhow::anyhow;
 use futures::future::{self, TryFutureExt};
 use github::{EventType, Webhook, DELIVERY_ID_HEADER, EVENT_TYPE_HEADER, SIGNATURE_HEADER};
@@ -32,14 +32,16 @@ const REPO_HTML: &str = include_str!("../../html/repo.html");
 
 #[derive(Clone, Debug)]
 pub struct Server {
+    config: GithubConfig,
     counter: Arc<AtomicUsize>,
     /// Installations which contain various services
     installations: Arc<RwLock<Vec<Installation>>>,
 }
 
 impl Server {
-    pub fn new() -> Self {
+    pub fn new(config: GithubConfig) -> Self {
         Self {
+            config,
             counter: Arc::new(AtomicUsize::new(0)),
             installations: Arc::new(RwLock::new(Vec::new())),
         }
@@ -205,6 +207,10 @@ impl Server {
     //TODO maybe insert into database here
     pub(super) async fn handle_webhook(&mut self, webhook: Webhook) -> Result<()> {
         trace!("Handling Webhook: {}", webhook.delivery_id);
+        if !webhook.check_signature(self.config.webhook_secret().map(str::as_bytes)) {
+            warn!("Signature check FAILED! Skipping Event.");
+            return Ok(());
+        }
 
         // Convert the webhook to an event so that we can get out the installation information
         let event = match webhook.to_event() {
@@ -232,11 +238,6 @@ impl Server {
                 .iter()
                 .find(|i| i.owner() == repository.owner.login && i.name() == repository.name)
         }) {
-            if !webhook.check_signature(installation.secret().map(str::as_bytes)) {
-                warn!("Signature check FAILED! Skipping Event.");
-                return Ok(());
-            }
-
             installation
                 .handle_webhook(&event, &webhook.delivery_id)
                 .await;

@@ -32,10 +32,6 @@ impl Installation {
         self.config.name()
     }
 
-    pub fn secret(&self) -> Option<&str> {
-        self.config.secret()
-    }
-
     #[allow(dead_code)]
     pub fn event_processor(&self) -> &EventProcessorSender {
         &self.event_processor

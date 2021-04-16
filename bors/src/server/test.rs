@@ -1,4 +1,5 @@
 use super::Server;
+use crate::config::GithubConfig;
 use hyper::{Body, Method, Request, StatusCode, Uri, Version};
 
 #[tokio::test]
@@ -6,7 +7,10 @@ async fn pull_request_event() {
     static PAYLOAD: &str = include_str!("../../test-input/pull-request-event-payload");
     let request = request_from_raw_http(PAYLOAD);
 
-    let mut service = Server::new();
+    let mut service = Server::new(GithubConfig {
+        github_api_token: "".to_string(),
+        webhook_secret: None,
+    });
 
     let resp = service.route_github(request).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
