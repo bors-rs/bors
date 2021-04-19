@@ -31,6 +31,7 @@ pub enum Conclusion {
     Cancelled,
     TimedOut,
     ActionRequired,
+    Skipped,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
