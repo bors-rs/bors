@@ -1,7 +1,6 @@
 use crate::{state::Repo, Result};
 use serde::Deserialize;
 use std::{
-    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -59,13 +58,9 @@ pub struct RepoConfig {
     #[serde(default)]
     maintainer_mode: bool,
 
-    /// Set of commit checks that must have succeeded in order to merge a PR
+    /// Set of checks, statuses, or workflows that must have succeeded in order to merge a PR
     #[serde(default)]
-    checks: HashMap<String, ChecksConfig>,
-
-    /// Set of commit statuses that must have succeeded in order to merge a PR
-    #[serde(default)]
-    status: HashMap<String, StatusConfig>,
+    checks: Vec<String>,
 
     /// Timeout for tests in seconds
     timeout_seconds: Option<u64>,
@@ -97,13 +92,7 @@ impl RepoConfig {
     }
 
     pub fn checks(&self) -> impl Iterator<Item = &str> {
-        let checks = self.checks.iter().map(|(_app, check)| check.name.as_ref());
-        let status = self
-            .status
-            .iter()
-            .map(|(_app, status)| status.context.as_ref());
-
-        checks.chain(status)
+        self.checks.iter().map(AsRef::as_ref)
     }
 
     pub fn timeout(&self) -> ::std::time::Duration {
@@ -116,16 +105,6 @@ impl RepoConfig {
     pub fn labels(&self) -> &Labels {
         &self.labels
     }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct ChecksConfig {
-    name: String,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct StatusConfig {
-    context: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
