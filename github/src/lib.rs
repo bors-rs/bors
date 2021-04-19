@@ -15,6 +15,7 @@ mod reactions;
 mod repo;
 mod user;
 mod webhook;
+mod workflow;
 
 pub use check::*;
 pub use client::Client;
@@ -29,3 +30,4 @@ pub use reactions::*;
 pub use repo::*;
 pub use user::*;
 pub use webhook::*;
+pub use workflow::*;

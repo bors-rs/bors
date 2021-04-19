@@ -1,7 +1,7 @@
 use super::{
     CheckRun, CheckSuite, Comment, Commit, DateTime, Hook, Issue, Key, Label, Milestone, Oid,
     Project, ProjectCard, ProjectColumn, PullRequest, Pusher, Repository, Review, ReviewComment,
-    Team, User,
+    Team, User, Workflow, WorkflowRun,
 };
 use serde::{de, Deserialize, Serialize};
 use std::{io, str::FromStr};
@@ -61,6 +61,7 @@ pub enum EventType {
     TeamAdd,
     Watch,
     Wildcard,
+    WorkflowRun,
 
     // Unknown Webhook event type
     Unknown,
@@ -121,6 +122,7 @@ impl FromStr for EventType {
             "team" => Team,
             "team_add" => TeamAdd,
             "watch" => Watch,
+            "workflow_run" => WorkflowRun,
             "*" => Wildcard,
             _ => Unknown,
         };
@@ -189,6 +191,7 @@ pub enum Event {
     Team(TeamEvent),
     TeamAdd(TeamAddEvent),
     Watch(WatchEvent),
+    WorkflowRun(WorkflowRunEvent),
 }
 
 impl Event {
@@ -254,6 +257,7 @@ impl Event {
             EventType::Team => Event::Team(serde_json::from_slice(json)?),
             EventType::TeamAdd => Event::TeamAdd(serde_json::from_slice(json)?),
             EventType::Watch => Event::Watch(serde_json::from_slice(json)?),
+            EventType::WorkflowRun => Event::WorkflowRun(serde_json::from_slice(json)?),
             // TODO have an error type if we try to De a wildcard event payload since they don't
             // exist
             EventType::Wildcard => unimplemented!(),
@@ -314,6 +318,7 @@ impl Event {
             Event::Team(_) => EventType::Team,
             Event::TeamAdd(_) => EventType::TeamAdd,
             Event::Watch(_) => EventType::Watch,
+            Event::WorkflowRun(_) => EventType::WorkflowRun,
         }
     }
 
@@ -361,7 +366,8 @@ impl Event {
             | Event::Star(StarEvent { repository, .. })
             | Event::Status(StatusEvent { repository, .. })
             | Event::TeamAdd(TeamAddEvent { repository, .. })
-            | Event::Watch(WatchEvent { repository, .. }) => Some(&repository),
+            | Event::Watch(WatchEvent { repository, .. })
+            | Event::WorkflowRun(WorkflowRunEvent { repository, .. }) => Some(&repository),
 
             Event::Installation(_)
             | Event::InstallationRepositories(_)
@@ -1251,6 +1257,29 @@ pub struct WatchEvent {
     pub sender: User,
     //pub organization: Organization, //TODO add type
     //pub installation: Installation, //TODO add type
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkflowRunAction {
+    Requested,
+    Completed,
+}
+
+/// Triggered when someone stars a repository. This event is not related to watching a repository.
+///
+/// GitHub API docs: https://developer.github.com/v3/activity/events/types/#watchevent
+#[derive(Clone, Debug, Deserialize)]
+pub struct WorkflowRunEvent {
+    /// The action that was performed.
+    pub action: WorkflowRunAction,
+    pub workflow: Workflow,
+    pub workflow_run: WorkflowRun,
+
+    // Populated by Webhook events
+    pub repository: Repository,
+    pub sender: User,
+    //pub organization: Organization, //TODO add type
 }
 
 #[cfg(test)]
