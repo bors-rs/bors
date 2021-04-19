@@ -3,6 +3,9 @@
 # requires creating personal access token with Full `repo` scope
 github-api-token = ""
 
+# Webhook secret used to verify webhooks originated from Github
+webhook-secret = ""
+
 [git]
 
 # file where an SSH private key lives, needed for fetching/pushing
@@ -21,9 +24,6 @@ email = ""
 owner = ""
 name = ""
 
-# Webhook secret used to verify webhooks originated from Github
-secret = ""
-
 # Require an approving Github review before a PR can be landed
 # require-review = true
 
@@ -33,8 +33,7 @@ secret = ""
 # Time that bors will wait before giving up on CI completing
 # timeout-seconds = <seconds>
 
-# Github checks and status's required to pass on the `auto` branch before merging a PR
-# [repo.checks.<app-name>]
-# name = ""
-# [repo.status.<app-name>]
-# name = ""
+# Github checks and status's, or workflows required to pass on the `auto` branch before merging a PR
+checks = [
+    "",
+]
