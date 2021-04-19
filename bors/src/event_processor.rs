@@ -169,6 +169,7 @@ impl EventProcessor {
                     .await?
                 }
             }
+            Event::WorkflowRun(e) => self.handle_workflow_run_event(e),
             // Unsupported Event
             _ => {}
         }
@@ -349,6 +350,30 @@ impl EventProcessor {
             pr.add_build_result(
                 &event.check_run.name,
                 &event.check_run.details_url,
+                conclusion,
+            );
+        }
+    }
+
+    fn handle_workflow_run_event(&mut self, event: &github::WorkflowRunEvent) {
+        // Skip the event if it hasn't completed
+        let conclusion = match (
+            event.action,
+            event.workflow_run.status,
+            event.workflow_run.conclusion,
+        ) {
+            (
+                github::WorkflowRunAction::Completed,
+                github::CheckStatus::Completed,
+                Some(conclusion),
+            ) => conclusion,
+            _ => return,
+        };
+
+        if let Some(pr) = self.pull_from_merge_oid(&event.workflow_run.head_sha) {
+            pr.add_build_result(
+                &event.workflow_run.name,
+                &event.workflow_run.html_url,
                 conclusion,
             );
         }
