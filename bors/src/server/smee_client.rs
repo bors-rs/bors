@@ -80,6 +80,8 @@ struct SmeeMessage<'a> {
     delivery_id: String,
     #[serde(rename = "x-hub-signature")]
     signature: Option<String>,
+    #[serde(rename = "x-hub-signature-256")]
+    signature_256: Option<String>,
 }
 
 struct ServerSentEvent<'a> {
@@ -139,6 +141,7 @@ impl<'b> SmeeEventParser<'b> {
                     event_type: smee_msg.event_type,
                     delivery_id: smee_msg.delivery_id,
                     signature: smee_msg.signature,
+                    signature_256: smee_msg.signature_256,
                     body: smee_msg.event.get().as_bytes().to_owned(),
                 };
                 SmeeEvent::Message(webhook)

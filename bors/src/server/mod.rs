@@ -9,7 +9,10 @@ pub use self::{installation::Installation, smee_client::SmeeClient};
 use crate::{config::GithubConfig, Error, Result};
 use anyhow::anyhow;
 use futures::future::{self, TryFutureExt};
-use github::{EventType, Webhook, DELIVERY_ID_HEADER, EVENT_TYPE_HEADER, SIGNATURE_HEADER};
+use github::{
+    EventType, Webhook, DELIVERY_ID_HEADER, EVENT_TYPE_HEADER, SIGNATURE_256_HEADER,
+    SIGNATURE_HEADER,
+};
 use hyper::{
     body,
     header::{HeaderValue, CONTENT_LENGTH, CONTENT_TYPE},
@@ -208,7 +211,10 @@ impl Server {
     pub(super) async fn handle_webhook(&mut self, webhook: Webhook) -> Result<()> {
         trace!("Handling Webhook: {}", webhook.delivery_id);
         if !webhook.check_signature(self.config.webhook_secret().map(str::as_bytes)) {
-            warn!("Signature check FAILED! Skipping Event.");
+            warn!(
+                "Signature check FAILED! Skipping Event. [{:?},{}]",
+                webhook.event_type, webhook.delivery_id
+            );
             return Ok(());
         }
 
@@ -282,12 +288,22 @@ async fn webhook_from_request(request: Request<Body>) -> Result<Webhook> {
         _ => None,
     };
 
+    let signature_256 = match request
+        .headers()
+        .get(SIGNATURE_256_HEADER)
+        .and_then(|h| HeaderValue::to_str(h).ok())
+    {
+        Some(signature) => Some(signature.to_owned()),
+        _ => None,
+    };
+
     let body = body::to_bytes(request.into_body()).await?.to_vec();
 
     Ok(Webhook {
         event_type,
         delivery_id,
         signature,
+        signature_256,
         body,
     })
 }

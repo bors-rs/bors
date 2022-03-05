@@ -1,5 +1,5 @@
 use super::{Event, EventType};
-use log::{trace, warn};
+use log::{debug, warn};
 
 /// The GitHub header key used to pass the event type
 ///
@@ -15,34 +15,48 @@ pub const DELIVERY_ID_HEADER: &str = "X-Github-Delivery";
 ///
 /// Github API docs: https://developer.github.com/webhooks/#delivery-headers
 pub const SIGNATURE_HEADER: &str = "X-Hub-Signature";
+pub const SIGNATURE_256_HEADER: &str = "X-Hub-Signature-256";
 
 #[derive(Clone, Debug)]
 pub struct Webhook {
     pub event_type: EventType,
     pub delivery_id: String,
     pub signature: Option<String>,
+    pub signature_256: Option<String>,
     pub body: Vec<u8>,
 }
 
 impl Webhook {
     pub fn check_signature(&self, key: Option<&[u8]>) -> bool {
-        match (key, &self.signature) {
-            (Some(key), Some(signature)) if signature.starts_with("sha1=") => {
-                let hash = hex::encode(hmacsha1::hmac_sha1(key, &self.body));
-                let signature = &signature["sha1=".len()..];
+        // Skip validation if no key
+        // FIXME: Refactor code so it's required
+        if key.is_none() {
+            warn!(
+                "[webhook {}] No secret specified; signature ignored",
+                self.delivery_id
+            );
+            return false;
+        }
 
-                trace!("hash: {}", hash);
-                trace!("sig:  {}", signature);
-                hash == signature
+        // Signature should have `sha256=` in front
+        if let Some(ref signature) = self.signature_256 {
+            if !signature.starts_with("sha256=") {
+                let hash = hex::encode(hmac_sha256::HMAC::mac(&self.body, key.unwrap()));
+                let signature = &signature["sha256=".len()..];
+
+                debug!(
+                    "[webhook {}] SHA-256 Found: {} Expected: {}",
+                    self.delivery_id, signature, hash
+                );
+                signature == hash
+            } else {
+                warn!("[webhook {}] Invalid signature header {}", self.delivery_id, signature);
+                false
             }
-            // We are expecting a signature and we either recieved it in a different format than
-            // expected or no signature was sent.
-            (Some(_), _) => false,
-            // No key or signature to check
-            (None, _) => {
-                warn!("No secret specified; signature ignored");
-                true
-            }
+        } else {
+            // There is no signature, reject it
+            warn!("[webhook {}] No signature present", self.delivery_id);
+            false
         }
     }
 
