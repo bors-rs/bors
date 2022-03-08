@@ -20,7 +20,8 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server as HyperServer, StatusCode,
 };
-use log::{error, info, trace, warn};
+use log::{debug, error, info, trace, warn};
+use lru::LruCache;
 use std::{
     net::SocketAddr,
     sync::{
@@ -28,7 +29,7 @@ use std::{
         Arc,
     },
 };
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 const INDEX_HTML: &str = include_str!("../../html/index.html");
 const REPO_HTML: &str = include_str!("../../html/repo.html");
@@ -39,6 +40,7 @@ pub struct Server {
     counter: Arc<AtomicUsize>,
     /// Installations which contain various services
     installations: Arc<RwLock<Vec<Installation>>>,
+    lru_webhooks: Arc<Mutex<LruCache<String, ()>>>,
 }
 
 impl Server {
@@ -47,6 +49,7 @@ impl Server {
             config,
             counter: Arc::new(AtomicUsize::new(0)),
             installations: Arc::new(RwLock::new(Vec::new())),
+            lru_webhooks: Arc::new(Mutex::new(LruCache::new(10000))),
         }
     }
 
@@ -207,8 +210,23 @@ impl Server {
             .body(Body::from("OK"))?)
     }
 
-    //TODO maybe insert into database here
+    /// Handles an incoming webhook request.  Drops duplicate requests
     pub(super) async fn handle_webhook(&mut self, webhook: Webhook) -> Result<()> {
+        // If we've recently seen this webhook, let's drop it to prevent duplicates
+        if let Some(()) = self
+            .lru_webhooks
+            .lock()
+            .await
+            .put(webhook.delivery_id.clone(), ())
+        {
+            debug!(
+                "Duplicate webhook: {}.  Dropping it...",
+                webhook.delivery_id
+            );
+            return Ok(());
+        }
+
+        // Process the current webhook
         trace!("Handling Webhook: {}", webhook.delivery_id);
         if !webhook.check_signature(self.config.webhook_secret().map(str::as_bytes)) {
             warn!(
