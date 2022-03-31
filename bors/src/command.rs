@@ -350,7 +350,21 @@ impl Command {
         info!("Canarying land of pr #{}", ctx.pr().number);
 
         match ctx.pr().status {
-            Status::InReview => ctx.pr_mut().canary_requested = true,
+            Status::InReview => {
+                let canary_running = if let Some(board) = ctx.project_board() {
+                    board.list_canary_cards(&ctx).await.map_or(false, |cards| cards.len() > 0)
+                } else {
+                    false
+                };
+
+                // If a canary is running, don't start this one up.
+                if canary_running {
+                    ctx.create_pr_comment("There is already another PR running a canary")
+                        .await?;
+                } else {
+                    ctx.pr_mut().canary_requested = true;
+                }
+            }
             Status::Queued(_) | Status::Testing { .. } => {
                 let msg = format!(
                     "@{} :bulb: This PR is currently queued for landing, cancel first if you want to canary the landing",

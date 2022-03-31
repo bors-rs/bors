@@ -50,7 +50,10 @@ impl Webhook {
                 );
                 signature == hash
             } else {
-                warn!("[webhook {}] Invalid signature header {}", self.delivery_id, signature);
+                warn!(
+                    "[webhook {}] Invalid signature header {}",
+                    self.delivery_id, signature
+                );
                 false
             }
         } else {

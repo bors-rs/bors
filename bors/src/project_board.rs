@@ -1,3 +1,4 @@
+use crate::event_processor::ActivePullRequestContext;
 use crate::{
     config::RepoConfig,
     graphql::GithubClient,
@@ -186,7 +187,6 @@ impl ProjectBoard {
         let canary_column =
             Self::unwrap_or_create_column(canary_column, CANARY_COLUMN_NAME, project_id, github)
                 .await?;
-
         Ok((review_column, queued_column, testing_column, canary_column))
     }
 
@@ -261,7 +261,14 @@ impl ProjectBoard {
         Ok(())
     }
 
-    async fn list_cards(github: &GithubClient, column_id: u64) -> Result<Vec<ProjectCard>> {
+    pub async fn list_canary_cards(
+        &self,
+        ctx: &ActivePullRequestContext<'_>,
+    ) -> Result<Vec<ProjectCard>> {
+        Self::list_cards(ctx.github(), self.canary_column.id).await
+    }
+
+    pub async fn list_cards(github: &GithubClient, column_id: u64) -> Result<Vec<ProjectCard>> {
         let mut list_options = ListProjectCardsOptions {
             archived_state: None,
             pagination_options: PaginationOptions {
