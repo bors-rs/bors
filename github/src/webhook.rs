@@ -38,24 +38,15 @@ impl Webhook {
             return false;
         }
 
-        // Signature should have `sha256=` in front
         if let Some(ref signature) = self.signature_256 {
-            if !signature.starts_with("sha256=") {
-                let hash = hex::encode(hmac_sha256::HMAC::mac(&self.body, key.unwrap()));
-                let signature = &signature["sha256=".len()..];
+            let hash = hex::encode(hmac_sha256::HMAC::mac(&self.body, key.unwrap()));
+            let signature = &signature["sha256=".len()..];
 
-                debug!(
-                    "[webhook {}] SHA-256 Found: {} Expected: {}",
-                    self.delivery_id, signature, hash
-                );
-                signature == hash
-            } else {
-                warn!(
-                    "[webhook {}] Invalid signature header {}",
-                    self.delivery_id, signature
-                );
-                false
-            }
+            debug!(
+                "[webhook {}] SHA-256 Found: {} Expected: {}",
+                self.delivery_id, signature, hash
+            );
+            signature == hash
         } else {
             // There is no signature, reject it
             warn!("[webhook {}] No signature present", self.delivery_id);
